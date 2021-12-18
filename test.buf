@@ -1,0 +1,10 @@
+# 4 instructions
+
+
+
+# in buf, x, y
+x = 10
+x = x + 10
+
+
+return vec4[1.0, 0.0, 1.0, 0.0]

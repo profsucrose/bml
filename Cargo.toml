@@ -1,5 +1,5 @@
 [package]
-name = "buffer-manipulation"
+name = "bml"
 version = "0.1.0"
 edition = "2021"
 

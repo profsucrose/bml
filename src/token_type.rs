@@ -1,10 +1,10 @@
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum TokenType {
     // single-char tokens
-    LeftParen, RightParen, Comma, LeftSquare, RightSquare, Semi, LeftBracket, RightBracket,
+    LeftParen, RightParen, Comma, LeftSquare, RightSquare, LeftBracket, RightBracket, Semi, Equals,
 
     // one-or-two char tokens
-    Plus, Minus, Slash, Star, Equals, GreaterThan, LessThan,
+    Plus, Minus, Slash, Star, EqualsEquals, GreaterThan, LessThan,
     LessThanEquals, GreaterThanEquals,
 
     // swizzling
@@ -15,6 +15,9 @@ pub enum TokenType {
 
     // literals
     Number, Vector,
+
+    // identifiers
+    Identifier,
 
     Eof
 }

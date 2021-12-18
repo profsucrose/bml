@@ -18,5 +18,5 @@ fn run(path: &Path) {
     let mut scanner = Scanner::new(file);
     let tokens = scanner.scan();
 
-    println!("Tokens: {:?}", tokens);
+    println!("Tokens: {:#?}", tokens);
 }

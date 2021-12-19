@@ -8,19 +8,36 @@ pub struct Scanner {
     line: usize,
     start: usize,
     tokens: Vec<Token>,
-    keywords: HashMap<&'static str, TokenType>
+    keywords: HashMap<&'static str, TokenType>,
+    swizzles: HashMap<char, TokenType>
 }
 
 impl Scanner {
-    pub fn new(source: String) -> Scanner {
+    pub fn from(source: String) -> Scanner {
         let mut keywords = HashMap::new();
 
         keywords.insert("if", TokenType::If);
         keywords.insert("else", TokenType::Else);
         keywords.insert("repeat", TokenType::Repeat);
-        keywords.insert("macro", TokenType::Macro);
         keywords.insert("return", TokenType::Return);
         keywords.insert("give", TokenType::Give);
+        keywords.insert("macro", TokenType::Macro);
+
+        keywords.insert("vec2", TokenType::Vec2);
+        keywords.insert("vec3", TokenType::Vec3);
+        keywords.insert("vec4", TokenType::Vec4);
+
+        let mut swizzles = HashMap::new();
+
+        swizzles.insert('x', TokenType::X);
+        swizzles.insert('y', TokenType::Y);
+        swizzles.insert('z', TokenType::Z);
+        swizzles.insert('w', TokenType::W);
+
+        swizzles.insert('r', TokenType::X);
+        swizzles.insert('g', TokenType::Y);
+        swizzles.insert('b', TokenType::Z);
+        swizzles.insert('a', TokenType::W);
 
         Scanner { 
             source, 
@@ -28,7 +45,8 @@ impl Scanner {
             line: 1, 
             start: 0, 
             tokens: vec![], 
-            keywords 
+            keywords,
+            swizzles 
         }
     }
 
@@ -54,7 +72,6 @@ impl Scanner {
             '}' => self.add_token(TokenType::RightBracket),
             ';' => self.add_token(TokenType::Semi),
             ',' => self.add_token(TokenType::Comma),
-            '.' => self.add_token(TokenType::Dot),
             '-' => self.add_token(TokenType::Minus),
             '+' => self.add_token(TokenType::Plus),
             '*' => self.add_token(TokenType::Star),
@@ -80,6 +97,7 @@ impl Scanner {
             },
             ' ' | '\r' | '\t' => {},
             '\n' => self.line += 1,
+            '.' => self.swazzle(),
             _ => {
                 if c.is_digit(10) {
                     self.number();
@@ -87,16 +105,35 @@ impl Scanner {
                     self.identifier();
                 } else {
                     // error
-                    println!("[line {}] Error: Unexpected character '{}'", self.line, c);
-                    process::exit(1);
+                    panic!("[line {}] Error: Unexpected character '{}'", self.line, c);
+                    // process::exit(1);
                 }
             }
         }
     }
 
+    fn swazzle(&mut self) {
+        self.add_token(TokenType::Dot);
+
+        loop {
+            if !self.at_end() {
+                if let Some(&swazzler) = self.swizzles.get(&self.peek()) {
+                    self.start = self.current;
+
+                    self.advance();
+                    self.add_token(swazzler);
+
+                    continue;
+                } 
+            }
+
+            break;
+        }
+    }
+
     fn identifier(&mut self) {
         loop {
-            if !self.peek().is_alphanumeric() {
+            if self.at_end() || (!self.peek().is_alphanumeric() &&  self.peek() != '_') {
                 break;
             }
 
@@ -114,7 +151,7 @@ impl Scanner {
     fn number(&mut self) {
         self.consume_digits();
 
-        if self.peek() == '.' && self.peek_next().is_digit(10) {
+        if !self.at_end() && self.peek() == '.' && self.peek_next().is_digit(10) {
             self.advance();
 
             self.consume_digits();

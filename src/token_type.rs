@@ -1,4 +1,4 @@
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum TokenType {
     // single-char tokens
     LeftParen, RightParen, Comma, LeftSquare, RightSquare, LeftBracket, RightBracket, Semi, Equals,
@@ -8,13 +8,13 @@ pub enum TokenType {
     LessThanEquals, GreaterThanEquals,
 
     // swizzling
-    Dot, X, Y, Z, W, R, G, B, A,
+    Dot, X, Y, Z, W,
 
     // keywords
-    If, Else, Repeat, Macro, Return, Give,
+    If, Else, Repeat, Return, Give, Macro,
 
     // literals
-    Number, Vector,
+    Number, Vec2, Vec3, Vec4,
 
     // identifiers
     Identifier,

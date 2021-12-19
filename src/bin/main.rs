@@ -1,6 +1,6 @@
 use std::{path::Path, env, process, fs};
 
-use bml::scanner::Scanner;
+use bml::{scanner::Scanner, preprocessor::PreProcessor};
 
 fn main() {
     let mut args = env::args().skip(1);
@@ -15,8 +15,14 @@ fn main() {
 
 fn run(path: &Path) {
     let file = fs::read_to_string(path).unwrap(); // TODO: handle unwrap
-    let mut scanner = Scanner::new(file);
+
+    let mut scanner = Scanner::from(file);
     let tokens = scanner.scan();
 
-    println!("Tokens: {:#?}", tokens);
+    // preprocess, expand macros
+    let mut preprocessor = PreProcessor::from(tokens);
+    let tokens = preprocessor.process();
+
+    // println!("Tokens: {:#?}", tokens);
+    println!("Program: {}", tokens.into_iter().map(|t| t.lexeme.clone()).collect::<String>());
 }

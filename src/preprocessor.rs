@@ -27,7 +27,7 @@ impl<'a> PreProcessor<'a> {
             match token.token_type {
                 // macro definition
                 TokenType::Macro => {
-                    let name = self.match_token(TokenType::Identifier);
+                    let name = self.consume(TokenType::Identifier);
 
                     if name.is_none() {
                         panic!("[line {}] Error: Expected macro definition", token.line);
@@ -35,7 +35,7 @@ impl<'a> PreProcessor<'a> {
 
                     let name = name.unwrap();
 
-                    if self.match_token(TokenType::LeftParen).is_none() {
+                    if self.consume(TokenType::LeftParen).is_none() {
                         panic!("[line {}] Error: Expected closing parenthesis", token.line);
                     }
 
@@ -43,11 +43,11 @@ impl<'a> PreProcessor<'a> {
 
                     loop {
                         // read parameters until closing parenthesis
-                        if self.match_token(TokenType::RightParen).is_some() {
+                        if self.consume(TokenType::RightParen).is_some() {
                             break;
                         }
 
-                        let parameter = self.match_token(TokenType::Identifier);
+                        let parameter = self.consume(TokenType::Identifier);
 
                         println!("param: {:?}", parameter);
 
@@ -62,7 +62,7 @@ impl<'a> PreProcessor<'a> {
 
                         parameters.push(parameter.lexeme);
 
-                        self.match_token(TokenType::Comma);
+                        self.consume(TokenType::Comma);
                     }
 
                     let mut template = Vec::new();
@@ -239,7 +239,8 @@ impl<'a> PreProcessor<'a> {
         self.tokens.get(self.current).unwrap().to_owned()
     }
 
-    fn match_token(&mut self, token_type: TokenType) -> Option<Token> {
+    // TODO: DRYer error handling
+    fn consume(&mut self, token_type: TokenType) -> Option<Token> {
         let token = self.peek();
         if token.token_type == token_type {
             self.current += 1;

@@ -99,7 +99,7 @@ impl Val {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum BuiltIn {
     Dist,
 }
@@ -237,7 +237,7 @@ pub fn eval(ast: &Ast, e: Env) -> EvalRet {
         Assign(i, to) => {
             let ERVal { mut env, val } = eval(&to, e).needs_val();
             env.set(*i, val);
-            EvalRet::new(env)
+            EvalRet::new(env).with_val(Some(val))
         }
         Block(nodes) => {
             let EvalRet { env, give, .. } =

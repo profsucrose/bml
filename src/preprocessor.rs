@@ -127,7 +127,6 @@ impl<'a> PreProcessor<'a> {
                 }
 
                 _ => {
-                    println!("Pushing {:?}", token.lexeme);
                     self.result.push(token);
                 }
             }

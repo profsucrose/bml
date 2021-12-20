@@ -1,9 +1,10 @@
 # todo 4 manaña
 
 ## BML
-    - finish preprocessor (nested macros)
-    - test AST, hook up w/ image library
-    - PARSER
+    * DONE: finish preprocessor (nested macros)
+    * DONE: test AST, hook up w/ image library
+    - Integrate lasso
+    - WORKING: PARSER
         - frag, coord, resolution, frame, max_frame
 
 ## SlackBot

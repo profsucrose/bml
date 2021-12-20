@@ -23,12 +23,12 @@ fn run(path: &Path) {
     let mut preprocessor = PreProcessor::from(tokens);
     let tokens = preprocessor.process();
 
-    // println!("Tokens: {:#?}", tokens);
-    println!(
-        "Program: {}",
-        tokens
-            .into_iter()
-            .map(|t| t.lexeme.clone())
-            .collect::<String>()
-    );
+    println!("Tokens: {:#?}", tokens);
+    // println!(
+    //     "Program: {}",
+    //     tokens
+    //         .into_iter()
+    //         .map(|t| t.lexeme.clone())
+    //         .collect::<String>()
+    // );
 }

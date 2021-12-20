@@ -1,4 +1,7 @@
+use lasso::{Rodeo, Spur};
 use std::collections::HashMap;
+
+use crate::ast::examples;
 
 #[derive(Debug, Copy, Clone)]
 pub enum Op {
@@ -22,7 +25,12 @@ pub enum Field {
 }
 
 #[derive(Copy, Clone, Debug)]
-struct Swizzle(Field, Option<Field>, Option<Field>, Option<Field>);
+pub struct Swizzle(
+    pub Field,
+    pub Option<Field>,
+    pub Option<Field>,
+    pub Option<Field>,
+);
 
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub enum Val {
@@ -92,18 +100,18 @@ impl Val {
 }
 
 #[derive(Debug)]
-enum BuiltIn {
+pub enum BuiltIn {
     Dist,
 }
 
 #[derive(Debug)]
 pub enum Ast {
     V(Val),
-    Assign(i32, Box<Ast>), /* i32 will prolly become lasso::Spur */
+    Assign(Spur, Box<Ast>), /* i32 will prolly become lasso::Spur */
     Block(Vec<Ast>),
     VecLiteral(Box<Ast>, Box<Ast>, Option<Box<Ast>>, Option<Box<Ast>>),
     VecAccess(Box<Ast>, Swizzle),
-    Ident(i32), /* will prolly become lasso::Spur */
+    Ident(Spur), /* will prolly become lasso::Spur */
     Return(Box<Ast>),
     Give(Box<Ast>),
     BinOp(Box<Ast>, Op, Box<Ast>),
@@ -117,26 +125,30 @@ pub enum Ast {
 
 #[test]
 fn invert_color_ast() {
-    let (env, ast) = examples::invert_color();
-    env.set(4, Val::Vec4(1.0, 0.0, 0.5, 0.0));
-    assert_eq!(Some(Val::Vec4(0.0, 1.0, 0.5, 1.0)), eval(ast, env).env.ret);
+    let (mut rodeo, mut env, ast) = examples::invert_color();
+
+    env.set(rodeo.get_or_intern("frag"), Val::Vec4(1.0, 0.0, 0.5, 0.0));
+    assert_eq!(Some(Val::Vec4(0.0, 1.0, 0.5, 1.0)), eval(&ast, env).env.ret);
 }
 
 #[test]
 fn closing_circle_ast() {
-    let (env, ast) = examples::closing_circle();
-    env.set(2, Val::Vec2(100.0, 100.0)); /* resolution */
-    env.set(3, Val::Vec2(90.0, 90.0)); /* coord */
-    env.set(4, Val::Vec4(1.0, 1.0, 1.0, 1.0)); /* frag */
-    env.set(5, Val::Float(10.0)); /* max_frame */
-    env.set(6, Val::Float(3.0)); /* frame */
+    let (mut rodeo, mut env, ast) = examples::closing_circle();
 
-    assert_eq!(Some(Val::Vec4(1.0, 1.0, 1.0, 1.0)), eval(ast, env).env.ret);
+    println!("{:?}", rodeo.strings());
+
+    env.set(rodeo.get_or_intern("resolution"), Val::Vec2(100.0, 100.0)); /* resolution */
+    env.set(rodeo.get_or_intern("coord"), Val::Vec2(90.0, 90.0)); /* coord */
+    env.set(rodeo.get_or_intern("frag"), Val::Vec4(1.0, 1.0, 1.0, 1.0)); /* frag */
+    env.set(rodeo.get_or_intern("max_frame"), Val::Float(10.0)); /* max_frame */
+    env.set(rodeo.get_or_intern("frame"), Val::Float(3.0)); /* frame */
+
+    assert_eq!(Some(Val::Vec4(1.0, 1.0, 1.0, 1.0)), eval(&ast, env).env.ret);
 }
 
 #[derive(Default)]
 pub struct Env {
-    vars: HashMap<i32, Val>,
+    vars: HashMap<Spur, Val>,
     pub ret: Option<Val>,
     parent: Option<Box<Env>>,
 }
@@ -150,14 +162,14 @@ impl Env {
         }
     }
 
-    fn get(&self, ident: i32) -> Option<Val> {
+    fn get(&self, ident: Spur) -> Option<Val> {
         self.vars
             .get(&ident)
             .map(|x| *x) // .as_deref()
             .or_else(|| self.parent.as_ref().and_then(|p| p.get(ident)))
     }
 
-    pub fn set(&mut self, ident: i32, to: Val) {
+    pub fn set(&mut self, ident: Spur, to: Val) {
         if self.vars.contains_key(&ident) || self.get(ident).is_none() {
             self.vars.insert(ident, to);
         } else if let Some(p) = self.parent.as_mut() {

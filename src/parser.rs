@@ -32,20 +32,20 @@ use crate::token_type::TokenType;
     precedence rules:
 
     stmt: expr if expr else expr | assign | "return" expr
-    assign: identifier '=' expr
-    call: builtin '(' arguments? ')'
+    assign: identifier "=" expr
+    call: builtin "(" arguments? ")"
     builtin: dist
     arguments: argument ("," argument)*
     argument: expr
     expr: equality | block | call
-    block: '{' blockStmt+ '}'
+    block: "{" blockStmt+ "}"
     blockStmt: stmt | "give" expr
-    equality: access ("==" access)*
-    access: comparison ('.' ('x'|'y'|'z'|'w')*)
+    equality: comparison ("==" comparison)*
     comparison: term (("<" | ">" | "<=" | ">=") term)*
     term: factor (("+" | "-") factor)*
-    factor: primary (("*" | "/") primary)*
-    primary: identifier | literal | "(" expression ")"
+    factor: access (("*" | "/") access)*
+    access: primary ("." ("x"|"y"|"z"|"w")*)
+    primary: identifier | literal | "(" expression ")" | access
 
     
     stmt: assign | "return" expr
@@ -72,9 +72,9 @@ use crate::token_type::TokenType;
 pub struct Parser<'a> {
     tokens: &'a Vec<Token>,
     current: usize,
-    lines: Vec<Ast>,
-    rodeo: Rodeo<Spur>,
-    builtins: HashMap<String, BuiltIn>
+    pub rodeo: Rodeo<Spur>,
+    builtins: HashMap<String, BuiltIn>,
+    lines: Vec<Ast>
 }
 
 impl<'a> Parser<'a> {
@@ -83,19 +83,17 @@ impl<'a> Parser<'a> {
 
         builtins.insert(String::from("dist"), BuiltIn::Dist);
 
-        Parser { tokens, current: 0, lines: Vec::new(), rodeo: Rodeo::new(), builtins }
+        Parser { tokens, current: 0, rodeo: Rodeo::new(), builtins, lines: Vec::new() }
     }
 
-    pub fn parse(&mut self) -> &Vec<Ast> {
-        let mut lines = Vec::new();
-
+    pub fn parse(&mut self) -> Ast {
         while !self.at_end() {
-            lines.push(self.statement());
+            let statement = self.statement();
+
+            self.lines.push(statement);
         }
 
-        self.lines = lines;
-
-        &self.lines
+        Ast::Block(self.lines.clone())
     }
 
     fn statement(&mut self) -> Ast {
@@ -133,6 +131,8 @@ impl<'a> Parser<'a> {
 
         self.consume(TokenType::Equals, "Expected '=' after variable declaration");
 
+        println!("ident: {}, current: {:?}", name, self.peek());
+
         let initializer = self.expression();
 
         Ast::Assign(self.identifier(name), Box::new(initializer))
@@ -140,13 +140,16 @@ impl<'a> Parser<'a> {
 
     fn expression(&mut self) -> Ast {
         if self.match_token(TokenType::LeftBracket) { return self.block(); }
-        if self.match_token(TokenType::Identifier) { return self.call(); }
+        if self.peek().token_type == TokenType::Identifier && self.peek_next().token_type == TokenType::LeftParen { 
+            self.current += 1;
+            return self.call(); 
+        }
 
         self.equality()
     }
 
     fn equality(&mut self) -> Ast {
-        let mut equality = self.access();
+        let mut equality = self.comparison();
 
         // TODO: add !=
         while self.match_token(TokenType::EqualsEquals) {
@@ -155,21 +158,22 @@ impl<'a> Parser<'a> {
                 token_type => panic!("[line {}] Error: unexpected binary operator \'{:?}\'", self.previous().line, token_type)
             };
 
-            let right = self.access();
+            let right = self.comparison();
 
-            equality = Ast::BinOp(Box::new(equality), Op::Equal, Box::new(right));
+            equality = Ast::BinOp(Box::new(equality), operator, Box::new(right));
         }
 
         equality
     }
 
     fn access(&mut self) -> Ast {
-        let mut access = self.comparison();
+        let mut access = self.primary();
 
         if self.match_token(TokenType::Dot) {
             let mut accessors = Vec::new();
 
             loop {
+                println!("Caling access loop");
                 let token = self.advance();
 
                 match token.token_type {
@@ -177,7 +181,10 @@ impl<'a> Parser<'a> {
                     TokenType::Y => accessors.push(Field::Y),
                     TokenType::Z => accessors.push(Field::Z),
                     TokenType::W => accessors.push(Field::W),
-                    _ => break
+                    _ => { 
+                        self.current -= 1;
+                        break
+                    }
                     // _ => panic!("[line {}] Error: Expected 'x', 'y', 'z', 'w', 'r', 'g', 'b', or 'a', got {}", token.line, token.lexeme)
                 }
             }
@@ -204,7 +211,7 @@ impl<'a> Parser<'a> {
         let mut term = self.term();
 
         loop {
-            let token = self.advance();
+            let token = self.peek();
 
             let op = match token.token_type {
                 TokenType::LessThan          => Some(Op::Less),
@@ -217,6 +224,9 @@ impl<'a> Parser<'a> {
             if op.is_none() { 
                 break;
             }
+
+            // advance cursor if comparison operand
+            self.current += 1;
 
             let op = op.unwrap();
 
@@ -236,7 +246,7 @@ impl<'a> Parser<'a> {
         let mut factor = self.factor();
 
         loop {
-            let token = self.advance();
+            let token = self.peek();
 
             let op = match token.token_type {
                 TokenType::Plus  => Some(Op::Add),
@@ -247,6 +257,9 @@ impl<'a> Parser<'a> {
             if op.is_none() { 
                 break;
             }
+
+            // advance cursor 
+            self.current += 1;
 
             let op = op.unwrap();
 
@@ -263,10 +276,14 @@ impl<'a> Parser<'a> {
     }
 
     fn factor(&mut self) -> Ast {
-        let mut primary = self.primary();
+        println!("Starting factor() w/ {:?}", self.peek());
+
+        let mut primary = self.access();
+
+        println!("End of first primary in factor");
 
         loop {
-            let token = self.advance();
+            let token = self.peek();
 
             let op = match token.token_type {
                 TokenType::Star  => Some(Op::Mul),
@@ -278,9 +295,12 @@ impl<'a> Parser<'a> {
                 break;
             }
 
+            // advance cursor
+            self.current += 1;
+
             let op = op.unwrap();
 
-            let right = self.primary();
+            let right = self.access();
 
             primary = Ast::BinOp(
                 Box::new(primary),
@@ -293,6 +313,8 @@ impl<'a> Parser<'a> {
     }
 
     fn primary(&mut self) -> Ast {
+        println!("Starting primary: {:?}", self.peek());
+
         if self.match_token(TokenType::LeftParen) {
             let expression = self.expression();
 
@@ -303,6 +325,7 @@ impl<'a> Parser<'a> {
         }
 
         if self.match_token(TokenType::Identifier) { 
+            println!("Called identity");
             return self.identity();
         }
 
@@ -310,6 +333,8 @@ impl<'a> Parser<'a> {
     }
 
     fn literal(&mut self) -> Ast {
+        println!("in literal(): {:?}", self.peek());
+
         // number literal
         if self.match_token(TokenType::Number) {
             return self.number(); 
@@ -324,9 +349,12 @@ impl<'a> Parser<'a> {
             semicolon: [1, 2, 3, 4] 
         */
 
+        println!("Lines: {:#?}, Last line: {:?}", self.lines, self.peek());
         self.consume(TokenType::LeftSquare, "Expected '[' in vector literal");
 
         let first = self.expression();
+
+        self.consume(TokenType::Comma, "Expected ',' in vector arguments");
 
         // TODO: add [expr; count] vector literal syntax
         if self.match_token(TokenType::Semi) {
@@ -337,17 +365,21 @@ impl<'a> Parser<'a> {
 
         let second = self.expression();
 
-        let third = if !self.match_token(TokenType::RightSquare) {
+        let third = if self.match_token(TokenType::Comma) {
+            let expression = self.expression();
+            Some(Box::new(expression))
+        } else {
+            None
+        };
+
+        let fourth = if self.match_token(TokenType::Comma) {
             Some(Box::new(self.expression()))
         } else {
             None
         };
 
-        let fourth = if third.is_some() && !self.match_token(TokenType::RightSquare) {
-            Some(Box::new(self.expression()))
-        } else {
-            None
-        };
+        println!("AT END OF VECTOR PARSER: {:?}", self.peek());
+        self.consume(TokenType::RightSquare, "vector literals must end with ']' and be up to 4 components");
 
         Ast::VecLiteral(Box::new(first), Box::new(second), third, fourth)
     }
@@ -447,7 +479,11 @@ impl<'a> Parser<'a> {
     }
 
     fn at_end(&self) -> bool {
-        self.current >= self.tokens.len()
+        self.peek().token_type == TokenType::Eof
+    }
+
+    fn peek_next(&self) -> &Token {
+        self.tokens.get(self.current + 1).expect("Unexpected EOF")
     }
 
     fn peek(&self) -> &Token {

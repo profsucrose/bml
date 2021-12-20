@@ -104,7 +104,7 @@ pub enum BuiltIn {
     Dist,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Ast {
     V(Val),
     Assign(Spur, Box<Ast>), /* i32 will prolly become lasso::Spur */

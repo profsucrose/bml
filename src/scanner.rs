@@ -90,9 +90,8 @@ impl Scanner {
             },
             '#' => {
                 // single line comment, skip line
-                loop {
+                while !self.at_end() && self.peek() != '\n' {
                     self.advance();
-                    if self.peek() == '\n' || self.at_end() { break; }
                 }
             },
             ' ' | '\r' | '\t' => {},

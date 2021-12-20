@@ -9,6 +9,10 @@ pub struct Token {
 
 impl Token {
     pub fn new(token_type: TokenType, lexeme: String, line: usize) -> Token {
-        Token { token_type, lexeme, line }
+        Token {
+            token_type,
+            lexeme,
+            line,
+        }
     }
 }

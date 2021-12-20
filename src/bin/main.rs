@@ -1,6 +1,6 @@
-use std::{path::Path, env, process, fs};
+use std::{env, fs, path::Path, process};
 
-use bml::{scanner::Scanner, preprocessor::PreProcessor};
+use bml::{preprocessor::PreProcessor, scanner::Scanner};
 
 fn main() {
     let mut args = env::args().skip(1);
@@ -24,5 +24,11 @@ fn run(path: &Path) {
     let tokens = preprocessor.process();
 
     // println!("Tokens: {:#?}", tokens);
-    println!("Program: {}", tokens.into_iter().map(|t| t.lexeme.clone()).collect::<String>());
+    println!(
+        "Program: {}",
+        tokens
+            .into_iter()
+            .map(|t| t.lexeme.clone())
+            .collect::<String>()
+    );
 }

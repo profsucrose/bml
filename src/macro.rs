@@ -8,7 +8,7 @@ use crate::{scanner::Scanner, token::Token, token_type::TokenType};
 
 pub struct Macro {
     keys: Vec<String>,
-    template: Vec<(TokenType, String)>
+    template: Vec<(TokenType, String)>,
 }
 
 // TODO: add string interning

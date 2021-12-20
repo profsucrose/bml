@@ -1,4 +1,4 @@
-use std::{collections::HashMap, process};
+use std::collections::HashMap;
 
 use crate::{token::Token, token_type::TokenType};
 
@@ -9,7 +9,7 @@ pub struct Scanner {
     start: usize,
     tokens: Vec<Token>,
     keywords: HashMap<&'static str, TokenType>,
-    swizzles: HashMap<char, TokenType>
+    swizzles: HashMap<char, TokenType>,
 }
 
 impl Scanner {
@@ -39,25 +39,28 @@ impl Scanner {
         swizzles.insert('b', TokenType::Z);
         swizzles.insert('a', TokenType::W);
 
-        Scanner { 
-            source, 
-            current: 0, 
-            line: 1, 
-            start: 0, 
-            tokens: vec![], 
+        Scanner {
+            source,
+            current: 0,
+            line: 1,
+            start: 0,
+            tokens: vec![],
             keywords,
-            swizzles 
+            swizzles,
         }
     }
 
     pub fn scan(&mut self) -> &Vec<Token> {
         loop {
-            if self.at_end() { break }
+            if self.at_end() {
+                break;
+            }
             self.start = self.current;
             self.scan_token();
         }
 
-        self.tokens.push(Token::new(TokenType::Eof, String::new(), self.line));
+        self.tokens
+            .push(Token::new(TokenType::Eof, String::new(), self.line));
         &self.tokens
     }
 
@@ -77,24 +80,36 @@ impl Scanner {
             '*' => self.add_token(TokenType::Star),
             '/' => self.add_token(TokenType::Slash),
             '=' => {
-                let token = if self.match_lexeme('=') { TokenType::EqualsEquals } else { TokenType::Equals };
+                let token = if self.match_lexeme('=') {
+                    TokenType::EqualsEquals
+                } else {
+                    TokenType::Equals
+                };
                 self.add_token(token);
-            },
+            }
             '<' => {
-                let token = if self.match_lexeme('=') { TokenType::LessThanEquals } else { TokenType::LessThan };
+                let token = if self.match_lexeme('=') {
+                    TokenType::LessThanEquals
+                } else {
+                    TokenType::LessThan
+                };
                 self.add_token(token);
-            },
+            }
             '>' => {
-                let token = if self.match_lexeme('=') { TokenType::GreaterThanEquals } else { TokenType::GreaterThan };
+                let token = if self.match_lexeme('=') {
+                    TokenType::GreaterThanEquals
+                } else {
+                    TokenType::GreaterThan
+                };
                 self.add_token(token);
-            },
+            }
             '#' => {
                 // single line comment, skip line
                 while !self.at_end() && self.peek() != '\n' {
                     self.advance();
                 }
-            },
-            ' ' | '\r' | '\t' => {},
+            }
+            ' ' | '\r' | '\t' => {}
             '\n' => self.line += 1,
             '.' => self.swazzle(),
             _ => {
@@ -123,7 +138,7 @@ impl Scanner {
                     self.add_token(swazzler);
 
                     continue;
-                } 
+                }
             }
 
             break;
@@ -132,7 +147,7 @@ impl Scanner {
 
     fn identifier(&mut self) {
         loop {
-            if self.at_end() || (!self.peek().is_alphanumeric() &&  self.peek() != '_') {
+            if self.at_end() || (!self.peek().is_alphanumeric() && self.peek() != '_') {
                 break;
             }
 
@@ -160,12 +175,12 @@ impl Scanner {
     }
 
     fn consume_digits(&mut self) {
-        loop { 
-            if !self.peek().is_digit(10) { 
+        loop {
+            if !self.peek().is_digit(10) {
                 break;
-            } 
+            }
 
-            self.advance(); 
+            self.advance();
         }
     }
 
@@ -178,15 +193,23 @@ impl Scanner {
     }
 
     fn match_lexeme(&mut self, expected: char) -> bool {
-        if self.at_end() { return false; }
-        if self.char_at(self.current) != expected { return false; }
+        if self.at_end() {
+            return false;
+        }
+        if self.char_at(self.current) != expected {
+            return false;
+        }
 
         self.current += 1;
         true
     }
 
     fn add_token(&mut self, token_type: TokenType) {
-        self.tokens.push(Token::new(token_type, self.source[self.start..self.current].to_string(), self.line));
+        self.tokens.push(Token::new(
+            token_type,
+            self.source[self.start..self.current].to_string(),
+            self.line,
+        ));
     }
 
     fn char_at(&self, n: usize) -> char {

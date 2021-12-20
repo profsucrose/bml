@@ -1,18 +1,23 @@
 use std::collections::HashMap;
 
-use crate::{token::Token, token_type::TokenType, r#macro::Macro};
+use crate::{r#macro::Macro, token::Token, token_type::TokenType};
 
 // TODO: replace w/ string interning
 pub struct PreProcessor<'a> {
     tokens: &'a Vec<Token>,
     result: Vec<Token>,
     current: usize,
-    macros: HashMap<String, Macro>
+    macros: HashMap<String, Macro>,
 }
 
 impl<'a> PreProcessor<'a> {
     pub fn from(tokens: &Vec<Token>) -> PreProcessor {
-        PreProcessor { tokens, result: vec![], current: 0, macros: HashMap::new() }
+        PreProcessor {
+            tokens,
+            result: vec![],
+            current: 0,
+            macros: HashMap::new(),
+        }
     }
 
     pub fn process(&mut self) -> &Vec<Token> {
@@ -39,7 +44,7 @@ impl<'a> PreProcessor<'a> {
                     loop {
                         // read parameters until closing parenthesis
                         if self.match_token(TokenType::RightParen).is_some() {
-                            break
+                            break;
                         }
 
                         let parameter = self.match_token(TokenType::Identifier);
@@ -47,7 +52,10 @@ impl<'a> PreProcessor<'a> {
                         println!("param: {:?}", parameter);
 
                         if parameter.is_none() {
-                            panic!("[line {}] Error: Expected parameter in macro definition", token.line);
+                            panic!(
+                                "[line {}] Error: Expected parameter in macro definition",
+                                token.line
+                            );
                         }
 
                         let parameter = parameter.unwrap();
@@ -63,20 +71,21 @@ impl<'a> PreProcessor<'a> {
                     while !self.at_end() && self.peek().line == token.line {
                         let template_token = self.advance();
 
-                        if template_token.token_type == TokenType::Identifier 
-                                && self.peek().token_type == TokenType::LeftParen 
-                                && self.macros.contains_key(&template_token.lexeme) {
+                        if template_token.token_type == TokenType::Identifier
+                            && self.peek().token_type == TokenType::LeftParen
+                            && self.macros.contains_key(&template_token.lexeme)
+                        {
                             let start = self.current - 1;
-    
+
                             // TODO: make sure call is valid
                             loop {
                                 let t = self.advance();
-    
+
                                 if t.token_type == TokenType::RightParen {
                                     break;
                                 }
                             }
-    
+
                             let nested_call = self.tokens[start..self.current].to_owned();
                             let expansion = self.expand_macro(token.line, &nested_call);
 
@@ -88,13 +97,15 @@ impl<'a> PreProcessor<'a> {
                         }
                     }
 
-                    self.macros.insert(name.lexeme, Macro::new(parameters, template));
-                },
+                    self.macros
+                        .insert(name.lexeme, Macro::new(parameters, template));
+                }
 
                 // macro calls
-                TokenType::Identifier => { 
-                    if self.peek().token_type == TokenType::LeftParen 
-                            && self.macros.contains_key(&token.lexeme) {
+                TokenType::Identifier => {
+                    if self.peek().token_type == TokenType::LeftParen
+                        && self.macros.contains_key(&token.lexeme)
+                    {
                         let start = self.current - 1;
 
                         // TODO: make sure call is valid
@@ -113,7 +124,7 @@ impl<'a> PreProcessor<'a> {
                     } else {
                         self.result.push(token);
                     }
-                },
+                }
 
                 _ => {
                     println!("Pushing {:?}", token.lexeme);
@@ -151,7 +162,7 @@ impl<'a> PreProcessor<'a> {
         } else {
             cursor += 1;
         }
-        
+
         loop {
             let token = call.get(cursor);
             cursor += 1;
@@ -171,7 +182,7 @@ impl<'a> PreProcessor<'a> {
 
                     args.push(current_arg.clone());
                     current_arg.clear();
-                },
+                }
                 TokenType::RightParen => {
                     if !current_arg.is_empty() {
                         args.push(current_arg.clone());
@@ -179,7 +190,7 @@ impl<'a> PreProcessor<'a> {
                     }
 
                     break;
-                },
+                }
 
                 // expand nested macro call
                 TokenType::Identifier => {
@@ -200,12 +211,11 @@ impl<'a> PreProcessor<'a> {
 
                         current_arg.append(&mut expansion);
                     }
-                },
+                }
 
                 _ => {
                     current_arg.push(token.to_owned());
                 }
-                
             }
         }
 
@@ -234,7 +244,7 @@ impl<'a> PreProcessor<'a> {
         let token = self.peek();
         if token.token_type == token_type {
             self.current += 1;
-            return Some(token)
+            return Some(token);
         }
 
         None

@@ -1,6 +1,3 @@
-# invert each pixel
-
 uv = coord / resolution
 return frag if dist(uv, [0.5, 0.5]) < (frame / max_frame) else [0; 4]
 
-return [1 - frag.r, 1 - frag.g, 1 - frag.b, 1]

@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-#[derive(Debug)]
+pub mod examples;
+
+#[derive(Debug, Copy, Clone)]
 pub enum Op {
   Add, Sub,
   Div, Mul,
@@ -9,9 +11,9 @@ pub enum Op {
   Equal
 }
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum Field { X, Y, Z, W }
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 struct Swizzle(Field, Option<Field>, Option<Field>, Option<Field>);
 
 #[derive(PartialEq, Clone, Copy, Debug)]
@@ -105,55 +107,33 @@ pub enum Ast {
 
 #[test]
 fn invert_color_ast() {
-  let mut env = Env::default();
-  env.set(0, Val::Vec4(1.0, 0.0, 0.5, 0.0));
-
-  use Ast::*;
-  fn b(a: Ast) -> Box<Ast> { Box::new(a) }
+  let (env, ast) = examples::invert_color();
+  env.set(4, Val::Vec4(1.0, 0.0, 0.5, 0.0));
   assert_eq!(
     Some(Val::Vec4(0.0, 1.0, 0.5, 1.0)),
-    eval(Return(b(VecLiteral(
-      b(BinOp(
-        b(V(Val::Float(1.0))),
-        Op::Sub,
-        b(VecAccess(b(Ident(0)), Swizzle(Field::X, None, None, None))),
-      )),
-      b(BinOp(
-        b(V(Val::Float(1.0))),
-        Op::Sub,
-        b(VecAccess(b(Ident(0)), Swizzle(Field::Y, None, None, None))),
-      )),
-      Some(b(BinOp(
-        b(V(Val::Float(1.0))),
-        Op::Sub,
-        b(VecAccess(b(Ident(0)), Swizzle(Field::Z, None, None, None))),
-      ))),
-      Some(b(V(Val::Float(1.0)))),
-    ))), env).env.ret
+    eval(ast, env).env.ret
   );
-
 }
 
 #[test]
 fn closing_circle_ast() {
-  // macro dot[a, b] a.x * b.x + a.y * b.y 
-  // macro dist[a, b] sqrt(dot(a - b, a - b))
-  use Ast::*;
-  fn b(a: Ast) -> Box<Ast> { Box::new(a) }
-  Block(vec![
-    Assign(0, b(BinOp(b(Ident(2)), Op::Div, b(Ident(3))))),
-    Return(b(If {
-      cond: b(Call(BuiltIn::Dist, vec![Ident(0), V(Val::Vec2(0.5, 0.5))])),
-      true_ret: b(Ident(2)),
-      false_ret: b(V(Val::Vec4(0.0, 0.0, 0.0, 0.0))),
-    }))
-  ]);
+  let (env, ast) = examples::closing_circle();
+  env.set(2, Val::Vec2(100.0, 100.0)); /* resolution */
+  env.set(3, Val::Vec2( 90.0,  90.0)); /* coord */
+  env.set(4, Val::Vec4(1.0, 1.0, 1.0, 1.0)); /* frag */
+  env.set(5, Val::Float(10.0)); /* max_frame */
+  env.set(6, Val::Float( 3.0)); /* frame */
+
+  assert_eq!(
+    Some(Val::Vec4(1.0, 1.0, 1.0, 1.0)),
+    eval(ast, env).env.ret
+  );
 }
 
 #[derive(Default)]
-struct Env {
+pub struct Env {
   vars: HashMap<i32, Val>,
-  ret: Option<Val>,
+  pub ret: Option<Val>,
   parent: Option<Box<Env>>,
 }
 
@@ -170,7 +150,7 @@ impl Env {
       .map(|x| *x) // .as_deref()
       .or_else(|| self.parent.as_ref().and_then(|p| p.get(ident)))
   }
-  fn set(&mut self, ident: i32, to: Val) {
+  pub fn set(&mut self, ident: i32, to: Val) {
     if self.vars.contains_key(&ident) || self.get(ident).is_none() {
       self.vars.insert(ident, to);
     } else if let Some(p) = self.parent.as_mut() {
@@ -183,8 +163,8 @@ impl Env {
   }
 }
 
-struct EvalRet {
-  env: Env,
+pub struct EvalRet {
+  pub env: Env,
   val: Option<Val>,
   give: Option<Val>,
 }
@@ -202,19 +182,19 @@ fn need_val(v: Option<Val>) -> Val {
   v.expect("context requires associated expression to return a value")
 }
 
-fn eval(ast: Ast, e: Env) -> EvalRet {
+pub fn eval(ast: &Ast, e: Env) -> EvalRet {
   use Ast::*;
   use Val::Float;
 
   match ast {
-    V(v) => EvalRet::new(e).with_val(Some(v)),
+    &V(v) => EvalRet::new(e).with_val(Some(v)),
     Assign(i, to) => {
-      let ERVal { mut env, val } = eval(*to, e).needs_val();
-      env.set(i, val);
+      let ERVal { mut env, val } = eval(&to, e).needs_val();
+      env.set(*i, val);
       EvalRet::new(env)
     },
     Block(nodes) => {
-      let EvalRet { env, give, .. } = nodes.into_iter().fold(
+      let EvalRet { env, give, .. } = nodes.iter().fold(
         EvalRet::new(e.child()),
         |acc, node| {
           if acc.give.or(acc.env.ret).is_some() {
@@ -227,8 +207,8 @@ fn eval(ast: Ast, e: Env) -> EvalRet {
       EvalRet::new(*env.parent.unwrap()).with_val(env.ret.or(give))
     }
     VecLiteral(xast, yast, None, None) => {
-      let ERVal { val: xval, env } = eval(*xast, e).needs_val();
-      let ERVal { val: yval, env } = eval(*yast, env).needs_val();
+      let ERVal { val: xval, env } = eval(&xast, e).needs_val();
+      let ERVal { val: yval, env } = eval(&yast, env).needs_val();
       match (xval, yval) {
         (Float(x), Float(y)) =>
           EvalRet::new(env).with_val(Some(Val::Vec2(x, y))),
@@ -237,9 +217,9 @@ fn eval(ast: Ast, e: Env) -> EvalRet {
     }
     VecLiteral(_, _, None, Some(_)) => panic!("fuck you"),
     VecLiteral(xast, yast, Some(zast), None) => {
-      let ERVal { val: xval, env } = eval(*xast, e).needs_val();
-      let ERVal { val: yval, env } = eval(*yast, env).needs_val();
-      let ERVal { val: zval, env } = eval(*zast, env).needs_val();
+      let ERVal { val: xval, env } = eval(&xast, e).needs_val();
+      let ERVal { val: yval, env } = eval(&yast, env).needs_val();
+      let ERVal { val: zval, env } = eval(&zast, env).needs_val();
       match (xval, yval, zval) {
         (Float(x), Float(y), Float(z)) =>
           EvalRet::new(env).with_val(Some(Val::Vec3(x, y, z))),
@@ -247,10 +227,10 @@ fn eval(ast: Ast, e: Env) -> EvalRet {
       }
     }
     VecLiteral(xast, yast, Some(zast), Some(wast)) => {
-      let ERVal { val: xval, env } = eval(*xast, e).needs_val();
-      let ERVal { val: yval, env } = eval(*yast, env).needs_val();
-      let ERVal { val: zval, env } = eval(*zast, env).needs_val();
-      let ERVal { val: wval, env } = eval(*wast, env).needs_val();
+      let ERVal { val: xval, env } = eval(&xast, e).needs_val();
+      let ERVal { val: yval, env } = eval(&yast, env).needs_val();
+      let ERVal { val: zval, env } = eval(&zast, env).needs_val();
+      let ERVal { val: wval, env } = eval(&wast, env).needs_val();
       match (xval, yval, zval, wval) {
         (Float(x), Float(y), Float(z), Float(w)) => 
           EvalRet::new(env).with_val(Some(Val::Vec4(x, y, z, w))),
@@ -258,9 +238,9 @@ fn eval(ast: Ast, e: Env) -> EvalRet {
       }
     }
     VecAccess(access_me, swiz) => {
-      let ERVal { env, val } = eval(*access_me, e).needs_val();
+      let ERVal { env, val } = eval(&access_me, e).needs_val();
       if let Val::Float(x) = val { panic!("Expected vec, found {}", x) }
-      EvalRet::new(env).with_val(Some(match swiz {
+      EvalRet::new(env).with_val(Some(match *swiz {
         Swizzle(x, None   , None   , None   ) =>
           Val::Float(val.get_field(x)),
         Swizzle(x, Some(y), None   , None   ) =>
@@ -273,22 +253,22 @@ fn eval(ast: Ast, e: Env) -> EvalRet {
         _ => panic!("invalid swizzle")
       }))
     },
-    Ident(i) => {
+    &Ident(i) => {
       let val = e.get(i);
       EvalRet::new(e).with_val(val)
     }
     Return(v) => {
-      let ERVal { mut env, val } = eval(*v, e).needs_val();
+      let ERVal { mut env, val } = eval(&v, e).needs_val();
       env.return_val(val);
       EvalRet::new(env)
     },
     Give(g) => {
-      let ERVal { env, val } = eval(*g, e).needs_val();
+      let ERVal { env, val } = eval(&g, e).needs_val();
       EvalRet::new(env).with_give(val)
     },
     BinOp(lhs, op, rhs) => {
-      let ERVal { env, val: lval } = eval(*lhs, e).needs_val();
-      let ERVal { env, val: rval } = eval(*rhs, env).needs_val();
+      let ERVal { env, val: lval } = eval(&lhs, e).needs_val();
+      let ERVal { env, val: rval } = eval(&rhs, env).needs_val();
 
       use Val::*;
       EvalRet::new(env).with_val(Some(match (lval, op, rval) {
@@ -299,28 +279,32 @@ fn eval(ast: Ast, e: Env) -> EvalRet {
             panic!("you cannot have a float lhs and a vec rhs \
             (TODO: static analysis this)");
         }
-        (_, Op::Sub, Float(_)) => lval.zipmap(rval, |l, r| l - r),
-        (_, Op::Add, Float(_)) => lval.zipmap(rval, |l, r| l + r),
-        (_, Op::Mul, Float(_)) => lval.zipmap(rval, |l, r| l * r),
-        (_, Op::Div, Float(_)) => lval.zipmap(rval, |l, r| l / r),
+        (_, Op::Sub, _) => lval.zipmap(rval, |l, r| l - r),
+        (_, Op::Add, _) => lval.zipmap(rval, |l, r| l + r),
+        (_, Op::Mul, _) => lval.zipmap(rval, |l, r| l * r),
+        (_, Op::Div, _) => lval.zipmap(rval, |l, r| l / r),
         (Float(l), Op::More, Float(r)) => Float((l > r) as i32 as f32),
         (Float(l), Op::Less, Float(r)) => Float((l < r) as i32 as f32),
         (Float(l), Op::MoreEq, Float(r)) => Float((l <= r) as i32 as f32),
         (Float(l), Op::LessEq, Float(r)) => Float((l >= r) as i32 as f32),
-        _ => panic!("unsupported scalar/vector binary operation relationship")
+        _ => panic!(
+          "unsupported scalar/vector binary operation relationship \
+          {:#?} {:#?} {:#?}",
+          lval, op, rval
+        )
       }))
     },
     If { cond, true_ret, false_ret } => {
-      let ERVal { env, val: condval } = eval(*cond, e).needs_val();
+      let ERVal { env, val: condval } = eval(&cond, e).needs_val();
       match condval {
-        Val::Float(f) if f == 0.0 => eval(*true_ret, env),
-        Val::Float(_) => eval(*false_ret, env),
+        Val::Float(f) if f == 0.0 => eval(&true_ret, env),
+        Val::Float(_) => eval(&false_ret, env),
         _ => panic!("If logic expects scalar conditionals"),
       }
     }
     Call(BuiltIn::Dist, args) => {
       let len = args.len();
-      let (env, mut vals) = args.into_iter().fold(
+      let (env, mut vals) = args.iter().fold(
         (e, Vec::with_capacity(len)),
         |(env, mut vals), arg| {
           let ERVal { env, val } = eval(arg, env).needs_val();

@@ -70,7 +70,7 @@ impl<'a> PreProcessor<'a> {
                             let start = self.current - 1;
 
                             // TODO: make sure call is valid
-                            while self.consume(TokenType::RightBracket).is_none() {
+                            while self.consume(TokenType::RightParen).is_none() {
                                 self.advance();
                             }
 

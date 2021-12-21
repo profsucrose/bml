@@ -130,7 +130,7 @@ fn closing_circle_ast() {
   );
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Env {
   vars: HashMap<i32, Val>,
   pub ret: Option<Val>,
@@ -145,7 +145,7 @@ impl Env {
       ret: None
     }
   }
-  fn get(&self, ident: i32) -> Option<Val> {
+  pub fn get(&self, ident: i32) -> Option<Val> {
     self.vars.get(&ident)
       .map(|x| *x) // .as_deref()
       .or_else(|| self.parent.as_ref().and_then(|p| p.get(ident)))
@@ -254,8 +254,8 @@ pub fn eval(ast: &Ast, e: Env) -> EvalRet {
       }))
     },
     &Ident(i) => {
-      let val = e.get(i);
-      EvalRet::new(e).with_val(val)
+      let val = e.get(i).unwrap_or_else(|| panic!("no such ident, {}", i));
+      EvalRet::new(e).with_val(Some(val))
     }
     Return(v) => {
       let ERVal { mut env, val } = eval(&v, e).needs_val();
@@ -283,6 +283,7 @@ pub fn eval(ast: &Ast, e: Env) -> EvalRet {
         (_, Op::Add, _) => lval.zipmap(rval, |l, r| l + r),
         (_, Op::Mul, _) => lval.zipmap(rval, |l, r| l * r),
         (_, Op::Div, _) => lval.zipmap(rval, |l, r| l / r),
+        // (Float(l), Op::More, Float(r)) => { dbg!(l > r); Float((l > r) as i32 as f32)},
         (Float(l), Op::More, Float(r)) => Float((l > r) as i32 as f32),
         (Float(l), Op::Less, Float(r)) => Float((l < r) as i32 as f32),
         (Float(l), Op::MoreEq, Float(r)) => Float((l <= r) as i32 as f32),
@@ -297,7 +298,7 @@ pub fn eval(ast: &Ast, e: Env) -> EvalRet {
     If { cond, true_ret, false_ret } => {
       let ERVal { env, val: condval } = eval(&cond, e).needs_val();
       match condval {
-        Val::Float(f) if f == 0.0 => eval(&true_ret, env),
+        Val::Float(f) if f == 1.0 => eval(&true_ret, env),
         Val::Float(_) => eval(&false_ret, env),
         _ => panic!("If logic expects scalar conditionals"),
       }
@@ -313,9 +314,10 @@ pub fn eval(ast: &Ast, e: Env) -> EvalRet {
         },
       );
       match (len, vals.pop(), vals.pop()) {
-        (2, Some(Val::Vec2(x0, y0)), Some(Val::Vec2(x1, y1))) => 
-          EvalRet::new(env)
-            .with_val(Some(Val::Float(x0 * x1 + y0 + y1))),
+        (2, Some(Val::Vec2(x0, y0)), Some(Val::Vec2(x1, y1))) => {
+          let (dx, dy) = (x0 - x1, y0 - y1);
+          EvalRet::new(env).with_val(Some(Val::Float((dx*dx + dy*dy).sqrt())))
+        }
         _ => panic!("unexpected inputs to dist (tbf it's janked rn)"),
       }
     }

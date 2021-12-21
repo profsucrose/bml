@@ -1,8 +1,6 @@
 use lasso::{Rodeo, Spur};
 use std::collections::HashMap;
 
-use crate::ast::examples;
-
 #[derive(Debug, Copy, Clone)]
 pub enum Op {
     Add,
@@ -151,29 +149,6 @@ pub enum Ast {
         false_ret: Box<Ast>,
     },
     Call(BuiltIn, Vec<Ast>),
-}
-
-#[test]
-fn invert_color_ast() {
-    let (mut rodeo, mut env, ast) = examples::invert_color();
-
-    env.set(rodeo.get_or_intern("frag"), Val::Vec4(1.0, 0.0, 0.5, 0.0));
-    assert_eq!(Some(Val::Vec4(0.0, 1.0, 0.5, 1.0)), eval(&ast, env).env.ret);
-}
-
-#[test]
-fn closing_circle_ast() {
-    let (mut rodeo, mut env, ast) = examples::closing_circle();
-
-    println!("{:?}", rodeo.strings());
-
-    env.set(rodeo.get_or_intern("resolution"), Val::Vec2(100.0, 100.0)); /* resolution */
-    env.set(rodeo.get_or_intern("coord"), Val::Vec2(90.0, 90.0)); /* coord */
-    env.set(rodeo.get_or_intern("frag"), Val::Vec4(1.0, 1.0, 1.0, 1.0)); /* frag */
-    env.set(rodeo.get_or_intern("max_frame"), Val::Float(10.0)); /* max_frame */
-    env.set(rodeo.get_or_intern("frame"), Val::Float(3.0)); /* frame */
-
-    assert_eq!(Some(Val::Vec4(1.0, 1.0, 1.0, 1.0)), eval(&ast, env).env.ret);
 }
 
 #[derive(Default)]

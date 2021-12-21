@@ -1,7 +1,6 @@
 use std::{env, fs, path::Path, process};
 
-use bml::{preprocessor::PreProcessor, scanner::Scanner, parser::Parser, ast::ast::{eval, Env, Val}};
-use lasso::Rodeo;
+use bml::{preprocessor::PreProcessor, scanner::Scanner, parser::Parser, ast::{eval, Env, Val}};
 
 fn main() {
     let mut args = env::args().skip(1);

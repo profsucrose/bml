@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use lasso::{Rodeo, Spur};
 
-use crate::ast::ast::{Ast, BuiltIn, Field, Op, Swizzle, Val};
+use crate::ast::{Ast, BuiltIn, Field, Op, Swizzle, Val};
 use crate::token::Token;
 use crate::token_type::TokenType;
 
@@ -46,8 +46,6 @@ use crate::token_type::TokenType;
     call: builtin "(" arguments? ")"
 */
 
-const DEBUG: bool = true;
-
 pub struct Parser<'a> {
     tokens: &'a Vec<Token>,
     current: usize,
@@ -73,9 +71,6 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse(&mut self) -> Ast {
-        if DEBUG {
-            println!("parse(); {:?}", self.peek())
-        };
         while !self.at_end() {
             let statement = self.statement();
 
@@ -86,9 +81,6 @@ impl<'a> Parser<'a> {
     }
 
     fn statement(&mut self) -> Ast {
-        if DEBUG {
-            println!("statement(); {:?}", self.peek())
-        };
         if self.match_token(TokenType::Identifier) {
             return self.assign();
         }
@@ -106,11 +98,6 @@ impl<'a> Parser<'a> {
     }
 
     fn r#if(&mut self) -> Ast {
-        if DEBUG {
-            println!("if(); {:?}", self.peek())
-        };
-        println!("If statement");
-
         let mut expression = self.expression();
 
         if self.match_token(TokenType::If) {
@@ -131,18 +118,12 @@ impl<'a> Parser<'a> {
     }
 
     fn r#return(&mut self) -> Ast {
-        if DEBUG {
-            println!("return(); {:?}", self.peek())
-        };
         let expression = self.r#if();
 
         Ast::Return(Box::new(expression))
     }
 
     fn assign(&mut self) -> Ast {
-        if DEBUG {
-            println!("assign(); {:?}", self.peek())
-        };
         let name = self.previous().lexeme;
 
         self.consume(TokenType::Equals, "Expected '=' after variable declaration");
@@ -153,22 +134,14 @@ impl<'a> Parser<'a> {
     }
 
     fn expression(&mut self) -> Ast {
-        if DEBUG {
-            println!("expression(); {:?}", self.peek())
-        };
-
-        if self.match_token(TokenType::LeftBracket) {
-            println!("Reading block: {:?}", self.peek());
-            return self.block();
+        if self.match_token(TokenType::LeftBracket) { 
+            return self.block(); 
         }
 
         self.equality()
     }
 
     fn equality(&mut self) -> Ast {
-        if DEBUG {
-            println!("equality(); {:?}", self.peek())
-        };
         let mut equality = self.comparison();
 
         // TODO: add !=
@@ -191,9 +164,6 @@ impl<'a> Parser<'a> {
     }
 
     fn access(&mut self) -> Ast {
-        if DEBUG {
-            println!("access(); {:?}", self.peek())
-        };
         let mut access = self.primary();
 
         if self.match_token(TokenType::Dot) {
@@ -236,9 +206,6 @@ impl<'a> Parser<'a> {
     }
 
     fn comparison(&mut self) -> Ast {
-        if DEBUG {
-            println!("comparison(); {:?}", self.peek())
-        };
         let mut term = self.term();
 
         loop {
@@ -270,9 +237,6 @@ impl<'a> Parser<'a> {
     }
 
     fn term(&mut self) -> Ast {
-        if DEBUG {
-            println!("term(); {:?}", self.peek())
-        };
         let mut factor = self.factor();
 
         loop {
@@ -302,9 +266,6 @@ impl<'a> Parser<'a> {
     }
 
     fn factor(&mut self) -> Ast {
-        if DEBUG {
-            println!("factor(); {:?}", self.peek())
-        };
         let mut primary = self.access();
 
         loop {
@@ -334,10 +295,6 @@ impl<'a> Parser<'a> {
     }
 
     fn primary(&mut self) -> Ast {
-        if DEBUG {
-            println!("primary(); {:?}", self.peek())
-        };
-
         if self.peek().token_type == TokenType::Identifier
             && self.peek_next().token_type == TokenType::LeftParen
         {
@@ -362,9 +319,6 @@ impl<'a> Parser<'a> {
     }
 
     fn literal(&mut self) -> Ast {
-        if DEBUG {
-            println!("literal(); {:?}", self.peek())
-        };
         // number literal
         if self.match_token(TokenType::Number) {
             return self.number();
@@ -374,14 +328,6 @@ impl<'a> Parser<'a> {
     }
 
     fn vector(&mut self) -> Ast {
-        if DEBUG {
-            println!("vector(); {:?}", self.peek())
-        };
-        /*
-            literal: [1; 2]
-            semicolon: [1, 2, 3, 4]
-        */
-
         self.consume(TokenType::LeftSquare, "Expected '[' in vector literal");
 
         let first = self.r#if();
@@ -425,24 +371,14 @@ impl<'a> Parser<'a> {
     }
 
     fn number(&mut self) -> Ast {
-        if DEBUG {
-            println!("number(); {:?}", self.peek())
-        };
-
         Ast::V(Val::Float(self.previous().lexeme.parse::<f32>().unwrap()))
     }
 
     fn identity(&mut self) -> Ast {
-        if DEBUG {
-            println!("identity(); {:?}", self.peek())
-        };
         Ast::Ident(self.rodeo.get_or_intern(self.previous().lexeme))
     }
 
     fn call(&mut self) -> Ast {
-        if DEBUG {
-            println!("call(); {:?}", self.peek())
-        };
         let token = self.previous();
         let name = &token.lexeme;
 
@@ -454,8 +390,6 @@ impl<'a> Parser<'a> {
             )
             .as_str(),
         );
-
-        println!("BUILT-IN, GOT {:?}", builtin);
 
         self.consume(
             TokenType::LeftParen,
@@ -477,44 +411,24 @@ impl<'a> Parser<'a> {
             "Expected \')\' in built-in function call",
         );
 
-        let result = Ast::Call(builtin, arguments);
-
-        println!("RESULT OF CALL: {:?}", result);
-        println!("Current token: {:?}", self.peek());
-
-        result
+        Ast::Call(builtin, arguments)
     }
 
     fn block(&mut self) -> Ast {
-        if DEBUG {
-            println!("block(); {:?}", self.peek())
-        };
         let mut statements = Vec::new();
 
         while !self.match_token(TokenType::RightBracket) {
             if self.match_token(TokenType::Give) {
                 statements.push(self.give());
-                println!("Pushing give: {:?}", self.peek());
             } else {
-                let statement = self.statement();
-
-                println!("PUSHING STATEMENT TO BLOCK: {:?}", statement);
-                statements.push(statement);
+                statements.push(self.statement());
             }
         }
 
-        let block = Ast::Block(statements);
-
-        println!("FINISHED BLOCK: {:?}", block);
-
-        block
+        Ast::Block(statements)
     }
 
     fn give(&mut self) -> Ast {
-        if DEBUG {
-            println!("give(); {:?}", self.peek())
-        };
-        // wrap expression for give statement
         let expression = self.r#if();
 
         Ast::Give(Box::new(expression))
@@ -530,10 +444,6 @@ impl<'a> Parser<'a> {
     }
 
     fn identifier(&mut self, name: String) -> Spur {
-        if DEBUG {
-            println!("identifier(); {:?}", self.peek())
-        };
-        println!("IDentifier: '{}'", name);
         self.rodeo.get_or_intern(name)
     }
 
@@ -542,7 +452,6 @@ impl<'a> Parser<'a> {
             return self.advance();
         }
 
-        println!("End: {:?}; {:?}", self.peek(), self.lines);
         panic!("[line {}] Error: {}", self.peek().line, error);
     }
 

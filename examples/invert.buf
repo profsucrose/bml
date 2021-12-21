@@ -1,5 +1,12 @@
 # invert each pixel
 
-uv = coord / resolution
+macro add_one(a) a + 1
 
-return [1 - frag.r, 1 - frag.g, 1 - frag.b, 1] if 1 { give 0.5 }
+return add_one(10)
+
+
+
+
+# uv = coord / resolution
+
+# return [1 - frag.r, 1 - frag.g, 1 - frag.b, 1] if 1 else { give 0.5 }

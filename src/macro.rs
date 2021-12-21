@@ -24,24 +24,9 @@ impl Macro {
         self.template.clone().into_iter().flat_map(
                 |(t, s)| match (t, symbols.get(&s)) {
                     (TokenType::Identifier, Some(expansion)) => expansion.clone(),
-                    _ => vec![ Token::new(t, s, line) ]
+                    _ => vec![Token::new(t, s, line)]
                 }
             )
             .collect::<Vec<Token>>()
-
-        // self.template
-        //     .clone()
-        //     .into_iter()
-        //     .fold(Vec::new(), |mut result, token| match token {
-        //         (TokenType::Identifier, symbol) => {
-        //             if let Some(expansion) = symbols.get(&symbol) {
-        //                 result.append(&mut expansion.clone());
-        //             } else {
-        //                 result.push(Token::new(token.0, symbol, line));
-        //             }
-        //             result
-        //         }
-        //         _ => result,
-        //     })
     }
 }

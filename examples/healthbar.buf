@@ -1,0 +1,86 @@
+# https://www.shadertoy.com/view/7s33Rs
+
+# source: https://iquilezles.org/www/articles/distfunctions2d/distfunctions2d.htm/ 
+macro not(a) a != 1.0
+macro neg(a) 0.0 - a
+macro and(a, b) a * b
+macro or(a, b) min(1, a + b)
+
+macro should_negate_s(vj, vi) {
+    e = vj - vi
+    w = p - vi
+    b = w - e * clamp(dot(w, e) / dot(e, e), 0, 1
+    d = min(d, dot(b, b))
+
+    c1 = b.p >= vi.y
+    c2 = p.y < vj.y
+    c3 = e.x * w.y > e.y * w.x
+
+    give or(and(and(c1, c2), c3), or(or(c1, c2), c3))
+}
+
+macro sd_polygon(p, v0, v1, v2, v3, v4, v5) {
+    d = dot(p - v0, p - v0)
+
+    s = 1.0
+
+    if should_negate_s(v0, v5) { s = neg(s) }
+    if should_negate_s(v1, v0) { s = neg(s) }
+    if should_negate_s(v2, v1) { s = neg(s) }
+    if should_negate_s(v3, v2) { s = neg(s) }
+    if should_negate_s(v4, v3) { s = neg(s) }
+    if should_negate_s(v5, v4) { s = neg(s) }
+}
+
+macro hex(p, s) {
+    p.x = p.x * 0.57735 * 2
+    p.y = p.y + mod(floor(p.x), 2) * 0.5
+    give smoothstep(1 0.1, abs(max(p.x * 1.5 + p.y, p.y * 2) - 1) / (0.38 + s))
+}
+
+macro inv_lerp(from, to, value) {
+    give max(0, min(1, (value - from) / (to - from)))
+}
+
+macro ease_out_circ(x) {
+    give sqrt(1 - pow(x - 1, 2))
+}
+
+uv = coord / resolution
+hp = 1 - ease_out_circ(mod(frame, 50) / 50)
+
+v0 = [0.97, 0.97]
+v1 = [0.13, 0.97]
+v2 = [0.03, 0.32]
+v3 = [0.73, 0.32]
+v4 = [0.77, 0.03]
+v5 = [0.97, 0.03]
+
+macro shift(v) v = (v + [0, 3]) / [1, 5]
+
+shift(v0)
+shift(v1)
+shift(v2)
+shift(v3)
+shift(v4)
+shift(v5)
+
+d = sd_polygon(uv, v0, v1, v2, v3, v4, v5)
+
+cd = 0.7 * (1.0 - smoothstep(0.01, 0.02, abs(d))) + (1.0 - smoothstep(-0.03,0.03, abs(0.02 - d)))
+
+c = [cd; 3] * [0.575, 0.5, 0.7]
+
+lowhp = inv_lerp(0.3, 0.27, hp)
+
+h = hex(frag * 0.04, lowhp * 0.2 * abs(sin(7 * frame)))
+
+hpx = (1.15 * (1 - uv.x)) - 0.08
+
+cbase = mix([1, 0, 1 - 0.8 * lowhp], [0.4, 0.2, 0.4], inv_lerp(hp - 0.03, hp, hpx))
+
+c = c + c.x < 0.0 * max(0, neg(d)) / 0.06 * cbase * h
+
+col = c * 0.7
+
+return [col.x, col.y, col.z, 1 - sign(d)]

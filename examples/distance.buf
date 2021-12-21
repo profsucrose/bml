@@ -1,15 +1,19 @@
 # distance calculator
 
+macro sqrt(a) { 
+    give pow(a, 0.5) 
+}
+
 macro distance(a, b) {
     x_dist = a.x - b.x
     y_dist = a.y - b.y
 
-    give pow(x_dist + y_dist, 0.5)
+    give sqrt(x_dist + y_dist)
 }
 
-x = dist(
-    [1.5, 0.5],
-    [0.2, 0.2]
-)
+y = [0.5, 0.2]
+z = [0.2, 0.5]
 
-return [ x, 0, 0, 1.0 ]
+x = distance(y, z)
+
+return [ x, x, x, 1.0 ]

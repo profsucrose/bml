@@ -44,30 +44,13 @@ fn run(path: &Path, image: Option<&Path>) {
 
     // println!("AST: {:#?}", ast);
 
+    let mut imgbuf = image
+        .map(|x| image::open(x).unwrap().to_rgba8())
+        .unwrap_or_else(|| ImageBuffer::new(100, 100));
 
+    process_image(&mut imgbuf, ast, parser);
 
-    match image {
-        Some(path) => {
-            let mut img = image::open(path).expect("Couldn't find image at path");
-
-            process_image(img.as_mut_rgba8().unwrap(), ast, parser);
-
-            img.save("output.png").unwrap();
-        }
-        None => {
-            let mut img = ImageBuffer::new(100, 100);
-
-            process_image(&mut img, ast, parser);
-
-            img.save("output.png").unwrap();
-        }
-    };
-
-    
-
-    
-
-    // let result = eval(&ast, env).env.ret;
+    imgbuf.save("output.png").unwrap();
 
     // info(format!("return={:?}", result).as_str());
 }
@@ -75,19 +58,25 @@ fn run(path: &Path, image: Option<&Path>) {
 fn process_image(img: &mut RgbaImage, ast: Ast, mut parser: Parser) {
     let (width, height) = img.dimensions();
 
+    let res = parser.rodeo.get_or_intern("resolution");
+    let coord = parser.rodeo.get_or_intern("coord");
+    let frag = parser.rodeo.get_or_intern("frag");
+    let frame = parser.rodeo.get_or_intern("frame");
+    let max_frame = parser.rodeo.get_or_intern("max_frame");
+
     for (x, y, pixel) in img.enumerate_pixels_mut() {
         let mut env = Env::default();
 
-        env.set(parser.rodeo.get_or_intern("resolution"), Val::Vec2(width as f32, height as f32));
+        env.set(res, Val::Vec2(width as f32, height as f32));
 
         // make (0, 0) bottom-left, `image` treats (0, 0) as top-left
-        env.set(parser.rodeo.get_or_intern("coord"), Val::Vec2((x + 1) as f32, (height - (y + 1)) as f32));
+        env.set(coord, Val::Vec2((x + 1) as f32, (height - (y + 1)) as f32));
 
-        env.set(parser.rodeo.get_or_intern("frag"), Val::Vec4(1.0, 1.0, 1.0, 1.0));
+        env.set(frag, Val::Vec4(1.0, 1.0, 1.0, 1.0));
 
         // TODO: frames
-        env.set(parser.rodeo.get_or_intern("frame"), Val::Float(0.0));
-        env.set(parser.rodeo.get_or_intern("max_frame"), Val::Float(0.0));
+        env.set(frame, Val::Float(0.0));
+        env.set(max_frame, Val::Float(0.0));
 
         match eval(&ast, env).env.ret {
             Some(Val::Vec4(r, g, b, a)) => pixel.0 = [ (r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8, (a * 255.0) as u8],

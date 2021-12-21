@@ -1,6 +1,9 @@
 # hello program
 
-x = 0.5
-y = 0.2 + 0.5
+macro mix(a) a + 10.0
 
-return [x, y, 1, 1]
+x = [1; 2]
+
+y = 0.5 if 1.0 else 0.2
+
+return y

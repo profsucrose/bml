@@ -110,6 +110,7 @@ pub enum Ast {
     Assign(Spur, Box<Ast>), /* i32 will prolly become lasso::Spur */
     Block(Vec<Ast>),
     VecLiteral(Box<Ast>, Box<Ast>, Option<Box<Ast>>, Option<Box<Ast>>),
+    VecRepeated(Box<Ast>, Box<Ast>),
     VecAccess(Box<Ast>, Swizzle),
     Ident(Spur), /* will prolly become lasso::Spur */
     Return(Box<Ast>),
@@ -250,6 +251,24 @@ pub fn eval(ast: &Ast, e: Env) -> EvalRet {
                 });
             EvalRet::new(*env.parent.unwrap()).with_val(env.ret.or(give))
         }
+        VecRepeated(value, length) => {
+            let ERVal { val: value, env } = eval(value, e).needs_val();
+            let ERVal { val: length, env } = eval(length, env).needs_val();
+
+            match (value, length) {
+                (Float(v), Float(l)) => {
+                    match l as usize {
+                        2 => EvalRet::new(env).with_val(Some(Val::Vec2(v, v))),
+                        3 => EvalRet::new(env).with_val(Some(Val::Vec3(v, v, v))),
+                        4 => EvalRet::new(env).with_val(Some(Val::Vec4(v, v, v, v))),
+                        n => {
+                            panic!("{} is an invalid vector length; must be 2 <= x <= 4", n)
+                        }
+                    }
+                }
+                _ => panic!("Both X and L in [X; L] expressions must evaluate to scalars"),
+            }
+        }
         VecLiteral(xast, yast, None, None) => {
             let ERVal { val: xval, env } = eval(&xast, e).needs_val();
             let ERVal { val: yval, env } = eval(&yast, env).needs_val();
@@ -352,7 +371,7 @@ pub fn eval(ast: &Ast, e: Env) -> EvalRet {
         } => {
             let ERVal { env, val: condval } = eval(&cond, e).needs_val();
             match condval {
-                Val::Float(f) if f == 0.0 => eval(&true_ret, env),
+                Val::Float(f) if f == 1.0 => eval(&true_ret, env),
                 Val::Float(_) => eval(&false_ret, env),
                 _ => panic!("If logic expects scalar conditionals"),
             }

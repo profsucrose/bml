@@ -23,27 +23,30 @@ fn run(path: &Path) {
     // preprocess, expand macros
     let mut preprocessor = PreProcessor::from(tokens);
     let tokens = preprocessor.process();
-    
+
+    println!(
+        "Program: {}",
+        tokens
+            .into_iter()
+            .map(|t| t.lexeme.clone())
+            .collect::<String>()
+    );
+
     // parse
     let mut parser = Parser::from(&tokens);
     let ast = parser.parse();
 
-    println!("AST: {:#?}", ast);
+    // println!("AST: {:#?}", ast);
 
     let mut env = Env::default();
 
     env.set(parser.rodeo.get_or_intern("resolution"), Val::Vec2(100.0, 100.0));
     env.set(parser.rodeo.get_or_intern("coord"), Val::Vec2(90.0, 90.0));
     env.set(parser.rodeo.get_or_intern("frag"), Val::Vec4(1.0, 1.0, 1.0, 1.0));
+    env.set(parser.rodeo.get_or_intern("frame"), Val::Float(1.0));
+    env.set(parser.rodeo.get_or_intern("max_frame"), Val::Float(10.0));
 
     let result = eval(&ast, env).env.ret;
 
     println!("Returned: {:?}", result);
-    // println!(
-    //     "Program: {}",
-    //     tokens
-    //         .into_iter()
-    //         .map(|t| t.lexeme.clone())
-    //         .collect::<String>()
-    // );
 }

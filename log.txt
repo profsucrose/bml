@@ -1,0 +1,85 @@
+parse(); Token { token_type: LeftBracket, lexeme: "{", line: 3 }
+READING NEW STATEMENT FROM PARSE LOOP
+statement(); Token { token_type: LeftBracket, lexeme: "{", line: 3 }
+READING NEW EXPRESSION
+expression(); Token { token_type: LeftBracket, lexeme: "{", line: 3 }
+Reading block: Token { token_type: Return, lexeme: "return", line: 4 }
+block(); Token { token_type: Return, lexeme: "return", line: 4 }
+statement(); Token { token_type: Return, lexeme: "return", line: 4 }
+return(); Token { token_type: Number, lexeme: "1.0", line: 4 }
+expression(); Token { token_type: Number, lexeme: "1.0", line: 4 }
+CALLING EQUALITY
+equality(); Token { token_type: Number, lexeme: "1.0", line: 4 }
+comparison(); Token { token_type: Number, lexeme: "1.0", line: 4 }
+term(); Token { token_type: Number, lexeme: "1.0", line: 4 }
+factor(); Token { token_type: Number, lexeme: "1.0", line: 4 }
+access(); Token { token_type: Number, lexeme: "1.0", line: 4 }
+primary(); Token { token_type: Number, lexeme: "1.0", line: 4 }
+literal(); Token { token_type: Number, lexeme: "1.0", line: 4 }
+number(); Token { token_type: RightBracket, lexeme: "}", line: 5 }
+PUSHING STATEMENT TO BLOCK: Return(V(Float(1.0)))
+FINISHED BLOCK: Block([Return(V(Float(1.0)))])
+READING IF BLOCK
+expression(); Token { token_type: Number, lexeme: "0.0", line: 5 }
+CALLING EQUALITY
+equality(); Token { token_type: Number, lexeme: "0.0", line: 5 }
+comparison(); Token { token_type: Number, lexeme: "0.0", line: 5 }
+term(); Token { token_type: Number, lexeme: "0.0", line: 5 }
+factor(); Token { token_type: Number, lexeme: "0.0", line: 5 }
+access(); Token { token_type: Number, lexeme: "0.0", line: 5 }
+primary(); Token { token_type: Number, lexeme: "0.0", line: 5 }
+literal(); Token { token_type: Number, lexeme: "0.0", line: 5 }
+number(); Token { token_type: Else, lexeme: "else", line: 5 }
+READING ELSE
+READING FALSE BLOCK: Token { token_type: LeftBracket, lexeme: "{", line: 5 }
+block(); Token { token_type: Return, lexeme: "return", line: 6 }
+statement(); Token { token_type: Return, lexeme: "return", line: 6 }
+return(); Token { token_type: Number, lexeme: "0.2", line: 6 }
+expression(); Token { token_type: Number, lexeme: "0.2", line: 6 }
+CALLING EQUALITY
+equality(); Token { token_type: Number, lexeme: "0.2", line: 6 }
+comparison(); Token { token_type: Number, lexeme: "0.2", line: 6 }
+term(); Token { token_type: Number, lexeme: "0.2", line: 6 }
+factor(); Token { token_type: Number, lexeme: "0.2", line: 6 }
+access(); Token { token_type: Number, lexeme: "0.2", line: 6 }
+primary(); Token { token_type: Number, lexeme: "0.2", line: 6 }
+literal(); Token { token_type: Number, lexeme: "0.2", line: 6 }
+number(); Token { token_type: RightBracket, lexeme: "}", line: 7 }
+PUSHING STATEMENT TO BLOCK: Return(V(Float(0.2)))
+FINISHED BLOCK: Block([Return(V(Float(0.2)))])
+FALSE BLOCK RETURNED: Block([Return(V(Float(0.2)))])
+IF BLOCK: If { cond: V(Float(0.0)), true_ret: Block([Return(V(Float(1.0)))]), false_ret: Block([Return(V(Float(0.2)))]) }
+AST: Block(
+    [
+        If {
+            cond: V(
+                Float(
+                    0.0,
+                ),
+            ),
+            true_ret: Block(
+                [
+                    Return(
+                        V(
+                            Float(
+                                1.0,
+                            ),
+                        ),
+                    ),
+                ],
+            ),
+            false_ret: Block(
+                [
+                    Return(
+                        V(
+                            Float(
+                                0.2,
+                            ),
+                        ),
+                    ),
+                ],
+            ),
+        },
+    ],
+)
+Returned: Some(Float(1.0))

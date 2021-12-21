@@ -39,17 +39,11 @@ impl<'a> PreProcessor<'a> {
                         panic!("[line {}] Error: Expected closing parenthesis", token.line);
                     }
 
+                    // read parameters
                     let mut parameters = Vec::new();
 
-                    loop {
-                        // read parameters until closing parenthesis
-                        if self.consume(TokenType::RightParen).is_some() {
-                            break;
-                        }
-
+                    while self.consume(TokenType::RightParen).is_none() {
                         let parameter = self.consume(TokenType::Identifier);
-
-                        println!("param: {:?}", parameter);
 
                         if parameter.is_none() {
                             panic!(
@@ -58,9 +52,7 @@ impl<'a> PreProcessor<'a> {
                             );
                         }
 
-                        let parameter = parameter.unwrap();
-
-                        parameters.push(parameter.lexeme);
+                        parameters.push(parameter.unwrap().lexeme);
 
                         self.consume(TokenType::Comma);
                     }
@@ -78,12 +70,8 @@ impl<'a> PreProcessor<'a> {
                             let start = self.current - 1;
 
                             // TODO: make sure call is valid
-                            loop {
-                                let t = self.advance();
-
-                                if t.token_type == TokenType::RightParen {
-                                    break;
-                                }
+                            while self.consume(TokenType::RightBracket).is_none() {
+                                self.advance();
                             }
 
                             let nested_call = self.tokens[start..self.current].to_owned();
@@ -109,12 +97,8 @@ impl<'a> PreProcessor<'a> {
                         let start = self.current - 1;
 
                         // TODO: make sure call is valid
-                        loop {
-                            let t = self.advance();
-
-                            if t.token_type == TokenType::RightParen {
-                                break;
-                            }
+                        while self.consume(TokenType::RightParen).is_none() {
+                            self.advance();
                         }
 
                         let nested_call = self.tokens[start..self.current].to_owned();
@@ -139,86 +123,105 @@ impl<'a> PreProcessor<'a> {
     fn expand_macro(&self, line: usize, call: &Vec<Token>) -> Vec<Token> {
         // assert that call starts with identifier, has left paren,
         // comma-delimited arguments, and then right paren
-        let mut cursor = 0;
-
         println!("Expanding macro: {:?}", call);
 
-        let mut args = Vec::new();
+        let name = match call.get(0) {
+            Some(token) => {
+                if token.token_type == TokenType::Identifier {
+                    token
+                } else {
+                    panic!(
+                        "[line {}] Error: expected macro call to start with identifier ({:?})",
+                        line, call
+                    );
+                }
+            }
+            None => panic!(
+                "[line {}] Error: expected macro call to have non-zero length: {:?}",
+                line, call
+            ),
+        };
+
+        match call.get(1) {
+            Some(Token {
+                token_type: TokenType::LeftParen,
+                ..
+            }) => {}
+            _ => panic!("[line {}] Expected '(' in macro expansion call", line),
+        }
+
+        let mut cursor = 2;
         let mut current_arg = Vec::new();
-
-        let name = call.get(cursor);
-        cursor += 1;
-
-        if name.is_none() {
-            // TODO: handle error
-        }
-
-        let name = name.unwrap();
-
-        // consume left paren
-        if call.get(cursor).is_none() {
-            // TODO: handle error
-        } else {
-            cursor += 1;
-        }
+        let mut args = Vec::new();
 
         loop {
-            let token = call.get(cursor);
-            cursor += 1;
-
-            if token.is_none() {
-                // TODO: throw error
-                // expected closing paren
-            }
-
-            let token = token.unwrap();
-
-            match token.token_type {
-                TokenType::Comma => {
-                    if current_arg.is_empty() {
-                        // TODO: throw error
-                    }
-
-                    args.push(current_arg.clone());
-                    current_arg.clear();
+            match call.get(cursor) {
+                None => {
+                    panic!("[line {}] Error: expected ')' in macro call", line);
                 }
-                TokenType::RightParen => {
-                    if !current_arg.is_empty() {
-                        args.push(current_arg.clone());
-                        drop(current_arg); // should no longer be used
-                    }
-
-                    break;
-                }
-
-                // expand nested macro call
-                TokenType::Identifier => {
-                    if self.macros.contains_key(&token.lexeme) {
-                        let start = cursor;
-
-                        // TODO: make sure call is valid
-                        loop {
-                            cursor = cursor + 1;
-
-                            if call.get(cursor).unwrap().token_type == TokenType::RightParen {
-                                break;
-                            }
+                Some(token) => match token {
+                    Token {
+                        token_type: TokenType::RightParen,
+                        ..
+                    } => {
+                        println!("RIGHT PAREN: {:?}", current_arg);
+                        if !current_arg.is_empty() {
+                            // move current_arg as should no longer be used
+                            args.push(current_arg);
                         }
 
-                        let nested_call = call[start..cursor].to_owned();
-                        let mut expansion = self.expand_macro(token.line, &nested_call);
-
-                        current_arg.append(&mut expansion);
+                        break;
                     }
-                }
+                    Token {
+                        token_type: TokenType::Comma,
+                        ..
+                    } => {
+                        args.push(current_arg.clone());
+                        current_arg.clear();
+                    }
+                    Token {
+                        token_type: TokenType::Identifier,
+                        ..
+                    } => {
+                        if self.macros.contains_key(&token.lexeme) {
+                            let start = cursor;
 
-                _ => {
-                    current_arg.push(token.to_owned());
-                }
+                            loop {
+                                match call.get(cursor) {
+                                    Some(Token {
+                                        token_type: TokenType::RightParen,
+                                        ..
+                                    }) => break,
+                                    None => panic!(
+                                        "[line {}] Error: expected closing ')' in macro call",
+                                        line
+                                    ),
+                                    _ => cursor += 1,
+                                }
+                            }
+
+                            let nested_call = call[start..cursor].to_owned();
+                            let mut expansion = self.expand_macro(token.line, &nested_call);
+
+                            current_arg.append(&mut expansion);
+                        } else {
+                            current_arg.push(token.clone());
+                        }
+                    }
+                    _ => {
+                        current_arg.push(token.clone());
+                    }
+                },
             }
+
+            cursor += 1;
         }
 
-        self.macros.get(&name.lexeme).unwrap().expand(line, args)
+        println!(
+            "Calling macro expansion with: {}, {}, {:?}",
+            name.lexeme, line, args
+        );
+        return self.macros.get(&name.lexeme).unwrap().expand(line, args);
     }
 
     fn at_end(&self) -> bool {

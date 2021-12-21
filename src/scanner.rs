@@ -50,7 +50,7 @@ impl Scanner {
         }
     }
 
-    pub fn scan(&mut self) -> &Vec<Token> {
+    pub fn scan(mut self) -> Vec<Token> {
         loop {
             if self.at_end() {
                 break;
@@ -61,7 +61,7 @@ impl Scanner {
 
         self.tokens
             .push(Token::new(TokenType::Eof, String::new(), self.line));
-        &self.tokens
+        self.tokens
     }
 
     fn scan_token(&mut self) {

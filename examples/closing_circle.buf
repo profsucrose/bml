@@ -1,10 +1,4 @@
 # draw black vignette that gets smaller each frame
 
-macro PI() 3.14159
-macro mult(a, b) a * PI()
-
 uv = coord / resolution
-
-radius = 0.5
-
-return frag if dist(uv, [0.5, 0.5]) < radius else [0, 0, 0, 1]
+return frag if dist(uv, [0.5, 0.5]) < (1.0 - frame/frame_count) else [0, 0, 0, 1]

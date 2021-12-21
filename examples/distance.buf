@@ -1,0 +1,15 @@
+# distance calculator
+
+macro distance(a, b) {
+    x_dist = a.x - b.x
+    y_dist = a.y - b.y
+
+    give pow(x_dist + y_dist, 0.5)
+}
+
+x = dist(
+    [1.5, 0.5],
+    [0.2, 0.2]
+)
+
+return [ x, 0, 0, 1.0 ]

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{scanner::Scanner, token::Token, token_type::TokenType};
+use crate::{token::Token, token_type::TokenType};
 
 // macro dot(a, b) a.x * b.x + a.y * b.y
 // (r, b) r.r * b.x + a.y * b.y

@@ -1,6 +1,11 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, io::BufRead};
 
-use crate::{r#macro::Macro, token::Token, token_type::TokenType};
+use crate::{
+    logger::{ErrorType, report},
+    r#macro::Macro,
+    token::Token,
+    token_type::TokenType,
+};
 
 // TODO: replace w/ string interning
 pub struct PreProcessor<'a> {
@@ -30,13 +35,19 @@ impl<'a> PreProcessor<'a> {
                     let name = self.consume(TokenType::Identifier);
 
                     if name.is_none() {
-                        panic!("[line {}] Error: Expected macro definition", token.line);
+                        report(
+                            ErrorType::Preprocessor,
+                            token.line, "Expected macro definition"
+                        );
                     }
 
                     let name = name.unwrap();
 
                     if self.consume(TokenType::LeftParen).is_none() {
-                        panic!("[line {}] Error: Expected closing parenthesis", token.line);
+                        report(
+                            ErrorType::Preprocessor,
+                            token.line, "Expected opening parenthesis"
+                        );
                     }
 
                     // read parameters
@@ -46,9 +57,9 @@ impl<'a> PreProcessor<'a> {
                         let parameter = self.consume(TokenType::Identifier);
 
                         if parameter.is_none() {
-                            panic!(
-                                "[line {}] Error: Expected parameter in macro definition",
-                                token.line
+                            report(
+                                ErrorType::Preprocessor,
+                                token.line, "Expected parameter in macro definition"
                             );
                         }
 
@@ -60,7 +71,8 @@ impl<'a> PreProcessor<'a> {
                     let mut template = Vec::new();
 
                     // read to rest of line for macro template expansion
-                    while !self.at_end() && self.peek().line == token.line {
+
+                    while !self.at_end() && self.peek().token_type != TokenType::RightBracket {
                         let template_token = self.advance();
 
                         if template_token.token_type == TokenType::Identifier
@@ -84,6 +96,13 @@ impl<'a> PreProcessor<'a> {
                             template.push((template_token.token_type, template_token.lexeme));
                         }
                     }
+
+                    if self.peek().token_type != TokenType::RightBracket {
+                        panic!("Should close w/ right bracket");
+                    }
+
+                    let token = self.advance();
+                    template.push((token.token_type, token.lexeme));
 
                     self.macros
                         .insert(name.lexeme, Macro::new(parameters, template));
@@ -122,32 +141,39 @@ impl<'a> PreProcessor<'a> {
     // dot([expr], [expr]) -> expansion
     fn expand_macro(&self, line: usize, call: &Vec<Token>) -> Vec<Token> {
         // assert that call starts with identifier, has left paren,
-        // comma-delimited arguments, and then right paren
-        println!("Expanding macro: {:?}", call);
-
         let name = match call.get(0) {
             Some(token) => {
-                if token.token_type == TokenType::Identifier {
-                    token
-                } else {
-                    panic!(
-                        "[line {}] Error: expected macro call to start with identifier ({:?})",
-                        line, call
+                if token.token_type != TokenType::Identifier {
+                    report(
+                        ErrorType::Preprocessor,
+                        token.line,
+                        format!(
+                            "Expected macro call to start with identifier, got '{:?}'",
+                            token.lexeme
+                        )
+                        .as_str()
                     );
                 }
+
+                token
             }
-            None => panic!(
-                "[line {}] Error: expected macro call to have non-zero length: {:?}",
-                line, call
-            ),
+            None => {
+                report(
+                    ErrorType::Preprocessor,
+                    line, "Expected macro call to have non-zero length"
+                );
+            }
         };
 
         match call.get(1) {
-            Some(Token {
-                token_type: TokenType::LeftParen,
-                ..
-            }) => {}
-            _ => panic!("[line {}] Expected '(' in macro expansion call", line),
+            Some(Token { token_type: TokenType::LeftParen, ..  }) => {}
+            _ => {
+                report(
+                    ErrorType::Preprocessor, 
+                    line, 
+                    "Expected '(' in macro expansion call"
+                );
+            },
         }
 
         let mut cursor = 2;
@@ -157,14 +183,10 @@ impl<'a> PreProcessor<'a> {
         loop {
             match call.get(cursor) {
                 None => {
-                    panic!("[line {}] Error: expected ')' in macro call", line);
+                    report(ErrorType::Preprocessor, line, "Expected ')' in macro call");
                 }
                 Some(token) => match token {
-                    Token {
-                        token_type: TokenType::RightParen,
-                        ..
-                    } => {
-                        println!("RIGHT PAREN: {:?}", current_arg);
+                    Token { token_type: TokenType::RightParen, ..  } => {
                         if !current_arg.is_empty() {
                             // move current_arg as should no longer be used
                             args.push(current_arg);
@@ -172,30 +194,24 @@ impl<'a> PreProcessor<'a> {
 
                         break;
                     }
-                    Token {
-                        token_type: TokenType::Comma,
-                        ..
-                    } => {
+                    Token { token_type: TokenType::Comma, ..  } => {
                         args.push(current_arg.clone());
                         current_arg.clear();
                     }
-                    Token {
-                        token_type: TokenType::Identifier,
-                        ..
-                    } => {
+                    Token { token_type: TokenType::Identifier, ..  } => {
                         if self.macros.contains_key(&token.lexeme) {
                             let start = cursor;
 
                             loop {
                                 match call.get(cursor) {
-                                    Some(Token {
-                                        token_type: TokenType::RightParen,
-                                        ..
-                                    }) => break,
-                                    None => panic!(
-                                        "[line {}] Error: expected closing ')' in macro call",
-                                        line
-                                    ),
+                                    Some(Token { token_type: TokenType::RightParen, ..  }) => break,
+                                    None => {
+                                        report(
+                                            ErrorType::Preprocessor,
+                                            line,
+                                            "Expected closing ')' in macro call"
+                                        );
+                                    },
                                     _ => cursor += 1,
                                 }
                             }
@@ -217,11 +233,7 @@ impl<'a> PreProcessor<'a> {
             cursor += 1;
         }
 
-        println!(
-            "Calling macro expansion with: {}, {}, {:?}",
-            name.lexeme, line, args
-        );
-        return self.macros.get(&name.lexeme).unwrap().expand(line, args);
+        self.macros.get(&name.lexeme).unwrap().expand(line, args)
     }
 
     fn at_end(&self) -> bool {

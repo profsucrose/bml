@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 image = "0.23.14"
 lasso = "0.6.0"
+colored = "2.0.0"

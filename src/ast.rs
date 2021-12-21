@@ -1,5 +1,7 @@
-use lasso::{Rodeo, Spur};
+use lasso::Spur;
 use std::collections::HashMap;
+
+use crate::logger::{report, ErrorType};
 
 #[derive(Debug, Copy, Clone)]
 pub enum Op {
@@ -132,14 +134,14 @@ pub enum BuiltIn {
 }
 
 #[derive(Debug, Clone)]
-pub enum Ast {
+pub enum AstNode {
     V(Val),
-    Assign(Spur, Box<Ast>), /* i32 will prolly become lasso::Spur */
+    Assign(Spur, Box<Ast>),
     Block(Vec<Ast>),
     VecLiteral(Box<Ast>, Box<Ast>, Option<Box<Ast>>, Option<Box<Ast>>),
     VecRepeated(Box<Ast>, Box<Ast>),
     VecAccess(Box<Ast>, Swizzle),
-    Ident(Spur), /* will prolly become lasso::Spur */
+    Ident(Spur),
     Return(Box<Ast>),
     Give(Box<Ast>),
     BinOp(Box<Ast>, Op, Box<Ast>),
@@ -149,6 +151,18 @@ pub enum Ast {
         false_ret: Box<Ast>,
     },
     Call(BuiltIn, Vec<Ast>),
+}
+
+#[derive(Debug, Clone)]
+pub struct Ast {
+    pub node: AstNode,
+    pub line: usize,
+}
+
+impl Ast {
+    pub fn new(node: AstNode, line: usize) -> Ast {
+        Ast { node, line }
+    }
 }
 
 #[derive(Default)]
@@ -234,10 +248,10 @@ fn need_val(v: Option<Val>) -> Val {
 }
 
 pub fn eval(ast: &Ast, e: Env) -> EvalRet {
-    use Ast::*;
+    use AstNode::*;
     use Val::Float;
 
-    match ast {
+    match &ast.node {
         &V(v) => EvalRet::new(e).with_val(Some(v)),
         Assign(i, to) => {
             let ERVal { mut env, val } = eval(&to, e).needs_val();
@@ -270,7 +284,7 @@ pub fn eval(ast: &Ast, e: Env) -> EvalRet {
                         }
                     }
                 }
-                _ => panic!("Both X and L in [X; L] expressions must evaluate to scalars"),
+                _ => report(ErrorType::Runtime, ast.line, "Both X and L in [X; L] in vector literal must evaluate to scalars"),
             }
         }
         VecLiteral(xast, yast, None, None) => {
@@ -322,7 +336,7 @@ pub fn eval(ast: &Ast, e: Env) -> EvalRet {
                     val.get_field(z),
                     val.get_field(w),
                 ),
-                _ => panic!("invalid swizzle"),
+                _ => report(ErrorType::Runtime, ast.line, "Invalid swizzle")
             }))
         }
         &Ident(i) => {
@@ -348,10 +362,8 @@ pub fn eval(ast: &Ast, e: Env) -> EvalRet {
                 | (Float(_), Op::Add, Vec2(_, _) | Vec3(_, _, _) | Vec4(_, _, _, _))
                 | (Float(_), Op::Mul, Vec2(_, _) | Vec3(_, _, _) | Vec4(_, _, _, _))
                 | (Float(_), Op::Div, Vec2(_, _) | Vec3(_, _, _) | Vec4(_, _, _, _)) => {
-                    panic!(
-                        "you cannot have a float lhs and a vec rhs \
-            (TODO: static analysis this)"
-                    );
+                    // TODO: check this in static analysis pass
+                    report(ErrorType::Runtime, ast.line, "Unexpected float on lhs and vector on rhs")
                 }
                 (_, Op::Sub, _) => lval.zipmap(rval, |l, r| l - r),
                 (_, Op::Add, _) => lval.zipmap(rval, |l, r| l + r),
@@ -361,11 +373,11 @@ pub fn eval(ast: &Ast, e: Env) -> EvalRet {
                 (Float(l), Op::Less, Float(r)) => Float((l < r) as i32 as f32),
                 (Float(l), Op::MoreEq, Float(r)) => Float((l <= r) as i32 as f32),
                 (Float(l), Op::LessEq, Float(r)) => Float((l >= r) as i32 as f32),
-                _ => panic!(
-                    "unsupported scalar/vector binary operation relationship \
-          {:#?} {:#?} {:#?}",
-                    lval, op, rval
-                ),
+                _ => report(
+                    ErrorType::Runtime,
+                    ast.line,
+                    format!("Unexpected scalar/vector binary operation relationship, got {:#?} {:#?} {:#?}", lval, op, rval).as_str(),
+                )
             }))
         }
         If {
@@ -377,7 +389,7 @@ pub fn eval(ast: &Ast, e: Env) -> EvalRet {
             match condval {
                 Val::Float(f) if f == 1.0 => eval(&true_ret, env),
                 Val::Float(_) => eval(&false_ret, env),
-                _ => panic!("If logic expects scalar conditionals"),
+                _ => report(ErrorType::Runtime, ast.line, format!("Expected scalar conditional in if expression, got {:#?}", condval).as_str()),
             }
         }
         Call(builtin, args) => {
@@ -393,10 +405,20 @@ pub fn eval(ast: &Ast, e: Env) -> EvalRet {
             match *builtin {
                 BuiltIn::Dist => {
                     match (len, vals.pop(), vals.pop()) {
-                        (2, Some(Val::Vec2(x0, y0)), Some(Val::Vec2(x1, y1))) => {
-                            EvalRet::new(env).with_val(Some(Val::Float(x0 * x1 + y0 + y1)))
+                        (2, Some(Val::Float(x0)), Some(Val::Float(x1))) => {
+                            EvalRet::new(env).with_val(Some(Val::Float((x1 - x0).abs())))
                         }
-                        _ => panic!("unexpected inputs to dist (tbf it's janked rn)"),
+                        (2, Some(Val::Vec2(x0, y0)), Some(Val::Vec2(x1, y1))) => {
+                            EvalRet::new(env).with_val(Some(Val::Float(((x1 - x0).powi(2) + (y1 - y0).powi(2)).sqrt())))
+                        } 
+                        (2, Some(Val::Vec3(x0, y0, z0)), Some(Val::Vec3(x1, y1, z1))) => {
+                            EvalRet::new(env).with_val(Some(Val::Float(((x1 - x0).powi(2) + (y1 - y0).powi(2) + (z1 - z0).powi(2)).sqrt())))
+                        }
+                        (2, Some(Val::Vec4(x0, y0, z0, w0)), Some(Val::Vec4(x1, y1, z1, w1))) => {
+                            EvalRet::new(env).with_val(Some(Val::Float(((x1 - x0).powi(2) + (y1 - y0).powi(2) + (z1 - z0).powi(2) + (w1 - w0).powi(2)).sqrt())))
+                        }
+                        (2, v1, v2) => report(ErrorType::Runtime, ast.line, format!("Unexpected inputs to dist(a, b), got {:#?} and {:#?}", v1, v2).as_str()),
+                        (n, _, _) => report(ErrorType::Runtime, ast.line, format!("Expected 2 inputs to dist(a, b), got {}", n).as_str())
                     }
                 }
                 BuiltIn::Radians => {
@@ -415,7 +437,8 @@ pub fn eval(ast: &Ast, e: Env) -> EvalRet {
                         (1, Some(Val::Vec4(x, y, z, w))) => {
                             EvalRet::new(env).with_val(Some(Val::Vec4(radians(x), radians(y), radians(z), radians(w))))
                         }
-                        _ => panic!("unexpected inputs to radians(), expected float, vec2, vec3, vec4")
+                        (n, _) => report(ErrorType::Runtime, ast.line, format!("Expected 1 input to radians(a), got {}", n).as_str()),
+                        (_, v) => report(ErrorType::Runtime, ast.line, "Unexpected input to radians(a), expected float, vec2, vec3, vec4")
                     }
                 },
                 BuiltIn::Degrees => {
@@ -434,7 +457,25 @@ pub fn eval(ast: &Ast, e: Env) -> EvalRet {
                         (1, Some(Val::Vec4(x, y, z, w))) => {
                             EvalRet::new(env).with_val(Some(Val::Vec4(degrees(x), degrees(y), degrees(z), degrees(w))))
                         }
-                        _ => panic!("unexpected inputs to radians(), expected float, vec2, vec3, vec4")
+                        _ => report(ErrorType::Runtime, ast.line, "Unexpected inputs to radians(), expected float, vec2, vec3, vec4")
+                    }
+                },
+                BuiltIn::Pow => {
+                    match (len, vals.pop(), vals.pop()) {
+                        (2, Some(Val::Float(x)), Some(Val::Float(exp))) => {
+                            EvalRet::new(env).with_val(Some(Val::Float(x.powf(exp))))
+                        }
+                        (2, Some(Val::Vec2(x, y)), Some(Val::Float(exp))) => {
+                            EvalRet::new(env).with_val(Some(Val::Vec2(x.powf(exp), y.powf(exp))))
+                        }
+                        (2, Some(Val::Vec3(x, y, z)), Some(Val::Float(exp))) => {
+                            EvalRet::new(env).with_val(Some(Val::Vec3(x.powf(exp), y.powf(exp), z.powf(exp))))
+                        }
+                        (2, Some(Val::Vec4(x, y, z, w)), Some(Val::Float(exp))) => {
+                            EvalRet::new(env).with_val(Some(Val::Vec4(x.powf(exp), y.powf(exp), z.powf(exp), w.powf(exp))))
+                        }
+                        (2, x, exp) => report(ErrorType::Runtime, ast.line, format!("Expected pow(vec*, float), got {:?}, {:?}", x, exp).as_str()),
+                        (n, _, _) => report(ErrorType::Runtime, ast.line, format!("Expected two inputs to pow(), got {}", n).as_str())
                     }
                 },
                 BuiltIn::Sin => todo!(),
@@ -443,7 +484,6 @@ pub fn eval(ast: &Ast, e: Env) -> EvalRet {
                 BuiltIn::Asin => todo!(),
                 BuiltIn::Acos => todo!(),
                 BuiltIn::Atan => todo!(),
-                BuiltIn::Pow => todo!(),
                 BuiltIn::Exp => todo!(),
                 BuiltIn::Log => todo!(),
                 BuiltIn::Sqrt => todo!(),

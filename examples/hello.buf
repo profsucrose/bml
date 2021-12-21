@@ -1,9 +1,0 @@
-# hello program
-
-macro mix(a) a + 10.0
-
-x = [1; 2]
-
-y = 0.5 if 1.0 else 0.2
-
-return y

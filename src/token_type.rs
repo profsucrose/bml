@@ -16,6 +16,7 @@ pub enum TokenType {
     Minus,
     Slash,
     Star,
+    NotEquals,
     EqualsEquals,
     GreaterThan,
     LessThan,

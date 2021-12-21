@@ -1,8 +1,6 @@
 use bml::{r#macro::Macro, token::Token, token_type::TokenType};
 
 pub fn main() {
-    println!("Macro testing");
-
     // macro dot(a, b) a.x * b.x + a.y + b.y
     let dot = Macro::new(
         vec!["a".to_string(), "b".to_string()],

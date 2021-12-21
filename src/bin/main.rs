@@ -1,5 +1,5 @@
 use image::io::Reader as ImageReader;
-mod ast;
+use bml::ast;
 use ast::Val;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

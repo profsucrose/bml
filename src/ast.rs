@@ -14,7 +14,7 @@ pub enum Op {
 #[derive(Copy, Clone, Debug)]
 pub enum Field { X, Y, Z, W }
 #[derive(Copy, Clone, Debug)]
-struct Swizzle(Field, Option<Field>, Option<Field>, Option<Field>);
+pub struct Swizzle(Field, Option<Field>, Option<Field>, Option<Field>);
 
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub enum Val {
@@ -84,7 +84,7 @@ impl Val {
 }
 
 #[derive(Debug)]
-enum BuiltIn { Dist }
+pub enum BuiltIn { Dist }
 
 #[derive(Debug)]
 pub enum Ast {

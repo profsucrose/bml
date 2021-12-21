@@ -19,25 +19,29 @@ impl Macro {
 
     pub fn expand(&self, line: usize, args: Vec<Vec<Token>>) -> Vec<Token> {
         // dot(a, b)
-        let mut symbols = HashMap::new();
+        let symbols = self.keys.clone().into_iter().zip(args.into_iter()).collect::<HashMap<_, _>>();
 
-        for i in 0..args.len() {
-            symbols.insert(self.keys[i].to_owned(), args[i].to_owned());
-        }
-
-        let mut result = Vec::new();
-
-        for token in self.template.iter() {
-            if token.0 == TokenType::Identifier {
-                if let Some(expansion) = symbols.get(&token.1) {
-                    expansion.into_iter().for_each(|t| result.push(t.to_owned()));
-                    continue;
+        self.template.clone().into_iter().flat_map(
+                |(t, s)| match (t, symbols.get(&s)) {
+                    (TokenType::Identifier, Some(expansion)) => expansion.clone(),
+                    _ => vec![ Token::new(t, s, line) ]
                 }
-            }
+            )
+            .collect::<Vec<Token>>()
 
-            result.push(Token::new(token.0, token.1.clone(), line));
-        }
-
-        result
+        // self.template
+        //     .clone()
+        //     .into_iter()
+        //     .fold(Vec::new(), |mut result, token| match token {
+        //         (TokenType::Identifier, symbol) => {
+        //             if let Some(expansion) = symbols.get(&symbol) {
+        //                 result.append(&mut expansion.clone());
+        //             } else {
+        //                 result.push(Token::new(token.0, symbol, line));
+        //             }
+        //             result
+        //         }
+        //         _ => result,
+        //     })
     }
 }

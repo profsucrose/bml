@@ -30,11 +30,7 @@ impl Macro {
         for token in self.template.iter() {
             if token.0 == TokenType::Identifier {
                 if let Some(expansion) = symbols.get(&token.1) {
-                    for t in expansion {
-                        let t = Token::new(t.token_type, t.lexeme.clone(), t.line);
-                        result.push(t.clone());
-                    }
-
+                    expansion.into_iter().for_each(|t| result.push(t.to_owned()));
                     continue;
                 }
             }

@@ -102,6 +102,35 @@ impl Val {
 #[derive(Debug, Clone, Copy)]
 pub enum BuiltIn {
     Dist,
+    Radians,
+    Degrees,
+    Sin,
+    Cos,
+    Tan,
+    Asin,
+    Acos,
+    Atan,
+    Pow,
+    Exp,
+    Log,
+    Sqrt,
+    InverseSqrt,
+    Abs,
+    Sign,
+    Floor,
+    Ceil,
+    Fract,
+    Mod,
+    Min,
+    Max,
+    Clamp,
+    Mix,
+    Step,
+    SmoothStep,
+    Length,
+    Dot,
+    Cross,
+    Norm
 }
 
 #[derive(Debug, Clone)]
@@ -376,7 +405,7 @@ pub fn eval(ast: &Ast, e: Env) -> EvalRet {
                 _ => panic!("If logic expects scalar conditionals"),
             }
         }
-        Call(BuiltIn::Dist, args) => {
+        Call(builtin, args) => {
             let len = args.len();
             let (env, mut vals) =
                 args.iter()
@@ -385,11 +414,81 @@ pub fn eval(ast: &Ast, e: Env) -> EvalRet {
                         vals.push(val);
                         (env, vals)
                     });
-            match (len, vals.pop(), vals.pop()) {
-                (2, Some(Val::Vec2(x0, y0)), Some(Val::Vec2(x1, y1))) => {
-                    EvalRet::new(env).with_val(Some(Val::Float(x0 * x1 + y0 + y1)))
+
+            match *builtin {
+                BuiltIn::Dist => {
+                    match (len, vals.pop(), vals.pop()) {
+                        (2, Some(Val::Vec2(x0, y0)), Some(Val::Vec2(x1, y1))) => {
+                            EvalRet::new(env).with_val(Some(Val::Float(x0 * x1 + y0 + y1)))
+                        }
+                        _ => panic!("unexpected inputs to dist (tbf it's janked rn)"),
+                    }
                 }
-                _ => panic!("unexpected inputs to dist (tbf it's janked rn)"),
+                BuiltIn::Radians => {
+                    let radians = |deg: f32| deg * std::f32::consts::PI / 180.0;
+
+                    match (len, vals.pop()) {
+                        (1, Some(Val::Float(x))) => {
+                            EvalRet::new(env).with_val(Some(Val::Float(radians(x))))
+                        }
+                        (1, Some(Val::Vec2(x, y))) => {
+                            EvalRet::new(env).with_val(Some(Val::Vec2(radians(x), radians(y))))
+                        }
+                        (1, Some(Val::Vec3(x, y, z))) => {
+                            EvalRet::new(env).with_val(Some(Val::Vec3(radians(x), radians(y), radians(z))))
+                        }
+                        (1, Some(Val::Vec4(x, y, z, w))) => {
+                            EvalRet::new(env).with_val(Some(Val::Vec4(radians(x), radians(y), radians(z), radians(w))))
+                        }
+                        _ => panic!("unexpected inputs to radians(), expected float, vec2, vec3, vec4")
+                    }
+                },
+                BuiltIn::Degrees => {
+                    let degrees = |rad: f32| rad * 180.0 / std::f32::consts::PI;
+
+                    match (len, vals.pop()) {
+                        (1, Some(Val::Float(x))) => {
+                            EvalRet::new(env).with_val(Some(Val::Float(degrees(x))))
+                        }
+                        (1, Some(Val::Vec2(x, y))) => {
+                            EvalRet::new(env).with_val(Some(Val::Vec2(degrees(x), degrees(y))))
+                        }
+                        (1, Some(Val::Vec3(x, y, z))) => {
+                            EvalRet::new(env).with_val(Some(Val::Vec3(degrees(x), degrees(y), degrees(z))))
+                        }
+                        (1, Some(Val::Vec4(x, y, z, w))) => {
+                            EvalRet::new(env).with_val(Some(Val::Vec4(degrees(x), degrees(y), degrees(z), degrees(w))))
+                        }
+                        _ => panic!("unexpected inputs to radians(), expected float, vec2, vec3, vec4")
+                    }
+                },
+                BuiltIn::Sin => todo!(),
+                BuiltIn::Cos => todo!(),
+                BuiltIn::Tan => todo!(),
+                BuiltIn::Asin => todo!(),
+                BuiltIn::Acos => todo!(),
+                BuiltIn::Atan => todo!(),
+                BuiltIn::Pow => todo!(),
+                BuiltIn::Exp => todo!(),
+                BuiltIn::Log => todo!(),
+                BuiltIn::Sqrt => todo!(),
+                BuiltIn::InverseSqrt => todo!(),
+                BuiltIn::Abs => todo!(),
+                BuiltIn::Sign => todo!(),
+                BuiltIn::Floor => todo!(),
+                BuiltIn::Ceil => todo!(),
+                BuiltIn::Fract => todo!(),
+                BuiltIn::Mod => todo!(),
+                BuiltIn::Min => todo!(),
+                BuiltIn::Max => todo!(),
+                BuiltIn::Clamp => todo!(),
+                BuiltIn::Mix => todo!(),
+                BuiltIn::Step => todo!(),
+                BuiltIn::SmoothStep => todo!(),
+                BuiltIn::Length => todo!(),
+                BuiltIn::Dot => todo!(),
+                BuiltIn::Cross => todo!(),
+                BuiltIn::Norm => todo!(),
             }
         }
     }

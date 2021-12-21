@@ -61,6 +61,7 @@ impl<'a> Parser<'a> {
         let mut builtins = HashMap::new();
 
         builtins.insert(String::from("dist"), BuiltIn::Dist);
+        builtins.insert(String::from("radians"), BuiltIn::Radians);
 
         Parser {
             tokens,

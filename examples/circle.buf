@@ -1,0 +1,12 @@
+# rainbow circle that dynamically grows
+# and shrinks depending on the frame
+
+uv = coord / resolution
+distance = dist(uv, [0.5, 0.5])
+radius = (sin(frame * 2) + 2) / 2 * 0.2 + 1
+
+return {
+    [sin(frame), cos(frame), 1, 1]
+} if distance < radius else {
+    [0; 4]
+}

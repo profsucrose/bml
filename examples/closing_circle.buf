@@ -3,7 +3,7 @@
 macro PI() 3.14159
 macro mult(a, b) a * PI()
 
-return mult(3, 3)
+return radians(180)
 
 # uv = coord / resolution
 

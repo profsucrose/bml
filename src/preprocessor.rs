@@ -1,7 +1,7 @@
 use std::{collections::HashMap, io::BufRead};
 
 use crate::{
-    logger::{ErrorType, report},
+    logger::{report, ErrorType},
     r#macro::Macro,
     token::Token,
     token_type::TokenType,
@@ -37,7 +37,8 @@ impl PreProcessor {
                     if name.is_none() {
                         report(
                             ErrorType::Preprocessor,
-                            token.line, "Expected macro definition"
+                            token.line,
+                            "Expected macro definition",
                         );
                     }
 
@@ -46,7 +47,8 @@ impl PreProcessor {
                     if self.consume(TokenType::LeftParen).is_none() {
                         report(
                             ErrorType::Preprocessor,
-                            token.line, "Expected opening parenthesis"
+                            token.line,
+                            "Expected opening parenthesis",
                         );
                     }
 
@@ -59,7 +61,8 @@ impl PreProcessor {
                         if parameter.is_none() {
                             report(
                                 ErrorType::Preprocessor,
-                                token.line, "Expected parameter in macro definition"
+                                token.line,
+                                "Expected parameter in macro definition",
                             );
                         }
 
@@ -72,7 +75,15 @@ impl PreProcessor {
 
                     // read to rest of line for macro template expansion
 
-                    while !self.at_end() && self.peek().token_type != TokenType::RightBracket {
+                    let is_block = self.peek().token_type == TokenType::LeftBracket;
+
+                    while !self.at_end()
+                        && (if is_block {
+                            self.peek().token_type != TokenType::RightBracket
+                        } else {
+                            self.peek().line == token.line
+                        })
+                    {
                         let template_token = self.advance();
 
                         if template_token.token_type == TokenType::Identifier
@@ -97,12 +108,14 @@ impl PreProcessor {
                         }
                     }
 
-                    if self.peek().token_type != TokenType::RightBracket {
-                        panic!("Should close w/ right bracket");
-                    }
+                    if is_block {
+                        if self.peek().token_type != TokenType::RightBracket {
+                            panic!("Should close w/ right bracket");
+                        }
 
-                    let token = self.advance();
-                    template.push((token.token_type, token.lexeme));
+                        let token = self.advance();
+                        template.push((token.token_type, token.lexeme));
+                    }
 
                     self.macros
                         .insert(name.lexeme, Macro::new(parameters, template));
@@ -151,7 +164,7 @@ impl PreProcessor {
                             "Expected macro call to start with identifier, got '{:?}'",
                             token.lexeme
                         )
-                        .as_str()
+                        .as_str(),
                     );
                 }
 
@@ -160,20 +173,24 @@ impl PreProcessor {
             None => {
                 report(
                     ErrorType::Preprocessor,
-                    line, "Expected macro call to have non-zero length"
+                    line,
+                    "Expected macro call to have non-zero length",
                 );
             }
         };
 
         match call.get(1) {
-            Some(Token { token_type: TokenType::LeftParen, ..  }) => {}
+            Some(Token {
+                token_type: TokenType::LeftParen,
+                ..
+            }) => {}
             _ => {
                 report(
-                    ErrorType::Preprocessor, 
-                    line, 
-                    "Expected '(' in macro expansion call"
+                    ErrorType::Preprocessor,
+                    line,
+                    "Expected '(' in macro expansion call",
                 );
-            },
+            }
         }
 
         let mut cursor = 2;
@@ -186,7 +203,10 @@ impl PreProcessor {
                     report(ErrorType::Preprocessor, line, "Expected ')' in macro call");
                 }
                 Some(token) => match token {
-                    Token { token_type: TokenType::RightParen, ..  } => {
+                    Token {
+                        token_type: TokenType::RightParen,
+                        ..
+                    } => {
                         if !current_arg.is_empty() {
                             // move current_arg as should no longer be used
                             args.push(current_arg);
@@ -194,24 +214,33 @@ impl PreProcessor {
 
                         break;
                     }
-                    Token { token_type: TokenType::Comma, ..  } => {
+                    Token {
+                        token_type: TokenType::Comma,
+                        ..
+                    } => {
                         args.push(current_arg.clone());
                         current_arg.clear();
                     }
-                    Token { token_type: TokenType::Identifier, ..  } => {
+                    Token {
+                        token_type: TokenType::Identifier,
+                        ..
+                    } => {
                         if self.macros.contains_key(&token.lexeme) {
                             let start = cursor;
 
                             loop {
                                 match call.get(cursor) {
-                                    Some(Token { token_type: TokenType::RightParen, ..  }) => break,
+                                    Some(Token {
+                                        token_type: TokenType::RightParen,
+                                        ..
+                                    }) => break,
                                     None => {
                                         report(
                                             ErrorType::Preprocessor,
                                             line,
-                                            "Expected closing ')' in macro call"
+                                            "Expected closing ')' in macro call",
                                         );
-                                    },
+                                    }
                                     _ => cursor += 1,
                                 }
                             }

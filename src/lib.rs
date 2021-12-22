@@ -6,3 +6,6 @@ pub mod token_type;
 pub mod ast;
 pub mod parser;
 pub mod logger;
+pub use scanner::Scanner;
+pub use preprocessor::PreProcessor;
+pub use parser::Parser;

@@ -72,14 +72,16 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn parse(&mut self) -> Ast {
+    pub fn parse(mut self) -> (Rodeo, Ast) {
         while !self.at_end() {
             let statement = self.statement();
 
             self.lines.push(statement);
         }
 
-        Ast::new(AstNode::Block(self.lines.clone()), self.previous().line)
+        let prev = self.previous().line;
+        let Self { rodeo, lines, .. } = self;
+        (rodeo, Ast::new(AstNode::Block(lines), prev))
     }
 
     fn statement(&mut self) -> Ast {

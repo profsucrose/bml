@@ -8,15 +8,15 @@ use crate::{
 };
 
 // TODO: replace w/ string interning
-pub struct PreProcessor<'a> {
-    tokens: &'a Vec<Token>,
+pub struct PreProcessor {
+    tokens: Vec<Token>,
     result: Vec<Token>,
     current: usize,
     macros: HashMap<String, Macro>,
 }
 
-impl<'a> PreProcessor<'a> {
-    pub fn from(tokens: &Vec<Token>) -> PreProcessor {
+impl PreProcessor {
+    pub fn from(tokens: Vec<Token>) -> PreProcessor {
         PreProcessor {
             tokens,
             result: vec![],
@@ -25,7 +25,7 @@ impl<'a> PreProcessor<'a> {
         }
     }
 
-    pub fn process(&mut self) -> &Vec<Token> {
+    pub fn process(mut self) -> Vec<Token> {
         while !self.at_end() {
             let token = self.advance();
 
@@ -148,7 +148,7 @@ impl<'a> PreProcessor<'a> {
             }
         }
 
-        &self.result
+        self.result
     }
 
     // dot([expr], [expr]) -> expansion

@@ -336,7 +336,7 @@ impl Ast {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Env {
     vars: HashMap<Spur, Val>,
     pub ret: Option<Val>,
@@ -510,8 +510,8 @@ pub fn eval(ast: &Ast, e: Env) -> EvalRet {
             }))
         }
         &Ident(i) => {
-            let val = e.get(i);
-            EvalRet::new(e).with_val(val)
+            let val = e.get(i).expect("couldn't find ident");
+            EvalRet::new(e).with_val(Some(val))
         }
         Return(v) => {
             let ERVal { mut env, val } = eval(&v, e).needs_val();

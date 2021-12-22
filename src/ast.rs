@@ -1,4 +1,4 @@
-use lasso::Spur;
+use lasso::{Spur, Rodeo};
 use std::collections::HashMap;
 
 use crate::logger::{report, ErrorType};
@@ -418,13 +418,13 @@ fn need_val(v: Option<Val>) -> Val {
     v.expect("context requires associated expression to return a value")
 }
 
-pub fn eval(ast: &Ast, e: Env) -> EvalRet {
+pub fn eval(ast: &Ast, e: Env, r: &Rodeo) -> EvalRet {
     use AstNode::*;
 
     match &ast.node {
         &V(v) => EvalRet::new(e).with_val(Some(v)),
         Assign(i, to) => {
-            let ERVal { mut env, val } = eval(&to, e).needs_val();
+            let ERVal { mut env, val } = eval(&to, e, r).needs_val();
             env.set(*i, val);
             EvalRet::new(env).with_val(Some(val))
         }
@@ -434,14 +434,14 @@ pub fn eval(ast: &Ast, e: Env) -> EvalRet {
                     if acc.give.or(acc.env.ret).is_some() {
                         acc
                     } else {
-                        eval(node, acc.env)
+                        eval(node, acc.env, r)
                     }
                 });
             EvalRet::new(*env.parent.unwrap()).with_val(env.ret.or(give))
         }
         VecRepeated(value, length) => {
-            let ERVal { val: value, env } = eval(value, e).needs_val();
-            let ERVal { val: length, env } = eval(length, env).needs_val();
+            let ERVal { val: value, env } = eval(value, e, r).needs_val();
+            let ERVal { val: length, env } = eval(length, env, r).needs_val();
 
             match (value, length) {
                 (Float(v), Float(l)) => {
@@ -458,8 +458,8 @@ pub fn eval(ast: &Ast, e: Env) -> EvalRet {
             }
         }
         VecLiteral(xast, yast, None, None) => {
-            let ERVal { val: xval, env } = eval(&xast, e).needs_val();
-            let ERVal { val: yval, env } = eval(&yast, env).needs_val();
+            let ERVal { val: xval, env } = eval(&xast, e, r).needs_val();
+            let ERVal { val: yval, env } = eval(&yast, env, r).needs_val();
             match (xval, yval) {
                 (Float(x), Float(y)) => EvalRet::new(env).with_val(Some(Val::Vec2(x, y))),
                 _ => panic!(),
@@ -467,9 +467,9 @@ pub fn eval(ast: &Ast, e: Env) -> EvalRet {
         }
         VecLiteral(_, _, None, Some(_)) => panic!("fuck you"),
         VecLiteral(xast, yast, Some(zast), None) => {
-            let ERVal { val: xval, env } = eval(&xast, e).needs_val();
-            let ERVal { val: yval, env } = eval(&yast, env).needs_val();
-            let ERVal { val: zval, env } = eval(&zast, env).needs_val();
+            let ERVal { val: xval, env } = eval(&xast, e, r).needs_val();
+            let ERVal { val: yval, env } = eval(&yast, env, r).needs_val();
+            let ERVal { val: zval, env } = eval(&zast, env, r).needs_val();
             match (xval, yval, zval) {
                 (Float(x), Float(y), Float(z)) => {
                     EvalRet::new(env).with_val(Some(Val::Vec3(x, y, z)))
@@ -478,10 +478,10 @@ pub fn eval(ast: &Ast, e: Env) -> EvalRet {
             }
         }
         VecLiteral(xast, yast, Some(zast), Some(wast)) => {
-            let ERVal { val: xval, env } = eval(&xast, e).needs_val();
-            let ERVal { val: yval, env } = eval(&yast, env).needs_val();
-            let ERVal { val: zval, env } = eval(&zast, env).needs_val();
-            let ERVal { val: wval, env } = eval(&wast, env).needs_val();
+            let ERVal { val: xval, env } = eval(&xast, e, r).needs_val();
+            let ERVal { val: yval, env } = eval(&yast, env, r).needs_val();
+            let ERVal { val: zval, env } = eval(&zast, env, r).needs_val();
+            let ERVal { val: wval, env } = eval(&wast, env, r).needs_val();
             match (xval, yval, zval, wval) {
                 (Float(x), Float(y), Float(z), Float(w)) => {
                     EvalRet::new(env).with_val(Some(Val::Vec4(x, y, z, w)))
@@ -490,7 +490,7 @@ pub fn eval(ast: &Ast, e: Env) -> EvalRet {
             }
         }
         VecAccess(access_me, swiz) => {
-            let ERVal { env, val } = eval(&access_me, e).needs_val();
+            let ERVal { env, val } = eval(&access_me, e, r).needs_val();
             if let Val::Float(x) = val {
                 panic!("Expected vec, found {}", x)
             }
@@ -510,21 +510,24 @@ pub fn eval(ast: &Ast, e: Env) -> EvalRet {
             }))
         }
         &Ident(i) => {
-            let val = e.get(i).expect("couldn't find ident");
-            EvalRet::new(e).with_val(Some(val))
+            if let Some(val) = e.get(i) {
+                return EvalRet::new(e).with_val(Some(val))
+            }
+
+            report(ErrorType::Runtime, ast.line, format!("Couldn't resolve identifier '{}'", r.resolve(&i)).as_str())
         }
         Return(v) => {
-            let ERVal { mut env, val } = eval(&v, e).needs_val();
+            let ERVal { mut env, val } = eval(&v, e, r).needs_val();
             env.return_val(val);
             EvalRet::new(env)
         }
         Give(g) => {
-            let ERVal { env, val } = eval(&g, e).needs_val();
+            let ERVal { env, val } = eval(&g, e, r).needs_val();
             EvalRet::new(env).with_give(val)
         }
         BinOp(lhs, op, rhs) => {
-            let ERVal { env, val: lval } = eval(&lhs, e).needs_val();
-            let ERVal { env, val: rval } = eval(&rhs, env).needs_val();
+            let ERVal { env, val: lval } = eval(&lhs, e, r).needs_val();
+            let ERVal { env, val: rval } = eval(&rhs, env, r).needs_val();
 
             use Val::*;
             EvalRet::new(env).with_val(Some(match (lval, op, rval) {
@@ -555,10 +558,10 @@ pub fn eval(ast: &Ast, e: Env) -> EvalRet {
             true_ret,
             false_ret,
         } => {
-            let ERVal { env, val: condval } = eval(&cond, e).needs_val();
+            let ERVal { env, val: condval } = eval(&cond, e, r).needs_val();
             match condval {
-                Val::Float(f) if f == 1.0 => eval(&true_ret, env),
-                Val::Float(_) => eval(&false_ret, env),
+                Val::Float(f) if f == 1.0 => eval(&true_ret, env, r),
+                Val::Float(_) => eval(&false_ret, env, r),
                 _ => report(ErrorType::Runtime, ast.line, format!("Expected scalar conditional in if expression, got {:#?}", condval).as_str()),
             }
         }
@@ -567,7 +570,7 @@ pub fn eval(ast: &Ast, e: Env) -> EvalRet {
             let (env, mut vals) =
                 args.iter()
                     .fold((e, Vec::with_capacity(len)), |(env, mut vals), arg| {
-                        let ERVal { env, val } = eval(arg, env).needs_val();
+                        let ERVal { env, val } = eval(arg, env, r).needs_val();
                         vals.push(val);
                         (env, vals)
                     });
@@ -607,8 +610,8 @@ pub fn eval(ast: &Ast, e: Env) -> EvalRet {
                         (1, Some(Val::Vec4(x, y, z, w))) => {
                             EvalRet::new(env).with_val(Some(Val::Vec4(radians(x), radians(y), radians(z), radians(w))))
                         }
-                        (n, _) => report(ErrorType::Runtime, ast.line, format!("Expected 1 input to radians(a), got {}", n).as_str()),
-                        _=> report(ErrorType::Runtime, ast.line, "Unexpected input to radians(a), expected float, vec2, vec3, vec4")
+                        (1, _) => report(ErrorType::Runtime, ast.line, "Unexpected input to radians(a), expected float, vec2, vec3, vec4"),
+                        (n, _) => report(ErrorType::Runtime, ast.line, format!("Expected 1 input to radians(a), got {}", n).as_str())
                     }
                 },
                 BuiltIn::Degrees => {

@@ -383,14 +383,11 @@ impl<'a> Parser<'a> {
         let token = self.previous();
         let name = &token.lexeme;
 
-        // TODO: error handling
-        let builtin = *self.builtins.get(name).expect(
-            format!(
-                "[line {}] Error: built-in function '{}' does not exist",
-                token.line, name
-            )
-            .as_str(),
-        );
+        let builtin = if let Some(&builtin) = self.builtins.get(name) {
+            builtin
+        } else {
+            report(ErrorType::Parse, token.line, format!("Built-in function '{}' does not exist", name).as_str())
+        };
 
         self.consume(
             TokenType::LeftParen,

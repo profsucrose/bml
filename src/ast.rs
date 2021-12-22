@@ -40,9 +40,32 @@ pub enum Val {
     Vec4(f32, f32, f32, f32),
 }
 
+use Val::*;
+
+mod math {
+    pub fn rad(x: f32) -> f32 {
+        x * std::f32::consts::PI / 180.0
+    }
+
+    pub fn deg(x: f32) -> f32 {
+        x * 180.0 / std::f32::consts::PI
+    }
+
+    pub fn inv_sqrt(x: f32) -> f32 {
+        let i = x.to_bits();
+        let i = 0x5f3759df - (i >> 1);
+        let y = f32::from_bits(i);
+    
+        y * (1.5 - 0.5 * x * y * y)
+    }
+
+    pub fn mix(x: f32, y: f32, a: f32) -> f32 {
+        x * (1.0 - a) + y * a
+    }
+}
+
 impl Val {
     pub fn map<F: FnMut(f32) -> f32>(self, mut f: F) -> Val {
-        use Val::*;
         match self {
             Float(x) => Float(f(x)),
             Vec2(x, y) => Vec2(f(x), f(y)),
@@ -51,8 +74,17 @@ impl Val {
         }
     }
 
+    pub fn zipmap3<F: FnMut(f32, f32, f32) -> f32>(self, o1: Self, o2: Self, mut f: F) -> Val {
+        match (self, o1, o2) {
+            (Float(x), Float(y), Float(z)) => Float(f(x, y, z)),
+            (Vec2(x0, x1), Vec2(y0, y1), Vec2(z0, z1)) => Vec2(f(x0, y0, z0), f(x1, y1, z1)),
+            (Vec3(x0, x1, x2), Vec3(y0, y1, y2), Vec3(z0, z1, z2)) => Vec3(f(x0, y0, z0), f(x1, y1, z1), f(x2, y2, z2)),
+            (Vec4(x0, x1, x2, x3), Vec4(y0, y1, y2, y3), Vec4(z0, z1, z2, z3)) => Vec4(f(x0, y0, z0), f(x1, y1, z1), f(x2, y2, z2), f(x3, y3, z3)),
+            _ => panic!("{}", format!("expected all args to zipmap3 be same type, got {:?}, {:?}, {:?}", self, o1, o2))
+        }
+    }
+
     pub fn zipmap<F: FnMut(f32, f32) -> f32>(self, o: Self, mut f: F) -> Val {
-        use Val::*;
         match (self, o) {
             (Float(l), Float(r)) => Float(f(l, r)),
             (Vec2(lx, ly), Float(r)) => Vec2(f(lx, r), f(ly, r)),
@@ -96,6 +128,145 @@ impl Val {
                 Vec4(_, _, _, w) => w,
             },
         }
+    }
+
+    pub fn radians(&self) -> Val { self.map(math::rad) }
+    pub fn degrees(&self) -> Val { self.map(math::deg) }
+    pub fn sin(&self) -> Val { self.map(f32::sin) }
+    pub fn cos(&self) -> Val { self.map(f32::cos) }
+    pub fn tan(&self) -> Val { self.map(f32::tan) }
+    pub fn asin(&self) -> Val { self.map(f32::asin) }
+    pub fn acos(&self) -> Val { self.map(f32::acos) }
+    pub fn atan(&self) -> Val { self.map(f32::atan) }
+    pub fn exp(&self) -> Val { self.map(f32::exp) }
+    pub fn log(&self) -> Val { self.map(|x| f32::log(std::f32::consts::E, x)) }
+    pub fn sqrt(&self) -> Val { self.map(f32::sqrt) }
+    pub fn invsqrt(&self) -> Val { self.map(math::inv_sqrt) }
+    pub fn abs(&self) -> Val { self.map(f32::abs) }
+    pub fn sign(&self) -> Val { self.map(f32::signum) }
+    pub fn floor(&self) -> Val { self.map(f32::floor) }
+    pub fn ceil(&self) -> Val { self.map(f32::ceil) }
+    pub fn fract(&self) -> Val { self.map(f32::fract) }
+
+    pub fn dot(&self, o: Self) -> Result<Val, String> {
+        match (self, o) {
+            (Vec2(x0, y0), Vec2(x1, y1)) => Ok(Float(x0 * x1 + y0 * y1)),
+            (Vec3(x0, y0, z0), Vec3(x1, y1, z1)) => Ok(Float(x0  * x1 + y0 * y1 + z0 * z1)),
+            (Vec4(x0, y0, z0, w0), Vec4(x1, y1, z1, w1)) => Ok(Float(x0 * x1 + y0 * y1 + z0 * z1 + w0 + w1)),
+            _ => Err(format!("Expected dot(vec2, vec2), dot(vec3, vec3), dot(vec4, vec4), got dot({:?}, {:?})", self, o))
+        }
+    }
+
+    pub fn modulo(&self, o: Self) -> Result<Val, String> { 
+        match (self, o) {
+            (Float(_), Float(_)) 
+                | (Vec2(_, _), Vec2(_, _))
+                | (Vec3(_, _, _), Vec3(_, _, _))
+                | (Vec4(_, _, _, _), Vec4(_, _, _, _))
+            => Ok(self.zipmap(o, |x, y| x % y)),
+            _ => Err(format!("Expected mod(float, float), mod(vec2, vec2), mod(vec3, vec3), mod(vec4, vec4), got mod({:?}, {:?})", self, o))
+        }
+    }
+
+    pub fn min(&self, val: &Val) -> Result<Val, String> { 
+        match (self, val) {
+            (Float(_), Float(_)) 
+                | (Vec2(_, _), Vec2(_, _))
+                | (Vec3(_, _, _), Vec3(_, _, _))
+                | (Vec4(_, _, _, _), Vec4(_, _, _, _))
+            => Ok(self.zipmap(*val, |x, y| x.min(y))),
+            _ => Err(format!("Expected min(float, float), min(vec2, vec2), min(vec3, vec3), min(vec4, vec4), got min({:?}, {:?})", self, val))
+        }
+    }
+
+    pub fn max(&self, val: &Val) -> Result<Val, String> { 
+        match (self, val) {
+            (Float(_), Float(_)) 
+                | (Vec2(_, _), Vec2(_, _))
+                | (Vec3(_, _, _), Vec3(_, _, _))
+                | (Vec4(_, _, _, _), Vec4(_, _, _, _))
+            => Ok(self.zipmap(*val, |x, y| x.max(y))),
+            _ => Err(format!("Expected max(float, float), max(vec2, vec2), max(vec3, vec3), max(vec4, vec4), got max({:?}, {:?})", self, val))
+        }
+    }
+
+    pub fn clamp(&self, min: Self, max: Self) -> Result<Val, String> {
+        match (self, min, max) {
+            (Float(_), Float(_), Float(_)) 
+                | (Vec2(_, _), Vec2(_, _), Vec2(_, _))
+                | (Vec3(_, _, _), Vec3(_, _, _), Vec3(_, _, _))
+                | (Vec4(_, _, _, _), Vec4(_, _, _, _), Vec4(_, _, _, _))
+            => Ok(self.zipmap3(min, max, |x, y, z| x.clamp(y, z))),
+
+            (Vec2(_, _), Vec2(_, _), Float(a))
+                | (Vec3(_, _, _), Vec3(_, _, _), Float(a))
+                | (Vec4(_, _, _, _), Vec4(_, _, _, _), Float(a))
+            => Ok(self.zipmap3(min, Vec4(a, a, a, a), |x, y, z| x.clamp(y, z))), 
+
+            _ => Err(format!("Expected clamp(float, float, float), clamp(vec2, vec2, vec2), clamp(vec3, vec3, vec3), clamp(vec4, vec4, vec4), got clamp({:?}, {:?}, {:?})", self, min, max))
+        }
+    }
+
+    pub fn mix(&self, y: Self, a: Self) -> Result<Val, String> {
+        match (self, y, a) {
+            (Float(_), Float(_), Float(_)) 
+                | (Vec2(_, _), Vec2(_, _), Vec2(_, _))
+                | (Vec3(_, _, _), Vec3(_, _, _), Vec3(_, _, _))
+                | (Vec4(_, _, _, _), Vec4(_, _, _, _), Vec4(_, _, _, _))
+            => Ok(self.zipmap3(y, a, math::mix)),
+
+            (Vec2(_, _), Vec2(_, _), Float(a))
+                | (Vec3(_, _, _), Vec3(_, _, _), Float(a))
+                | (Vec4(_, _, _, _), Vec4(_, _, _, _), Float(a))
+            => Ok(self.zipmap3(y, Vec4(a, a, a, a), math::mix)),
+
+            _ => Err(format!("Expected mix(float, float, float), mix(vec2, vec2, float), mix(vec3, vec3, float), mix(vec4, vec4, float), mix(vec2, vec2, vec2), mix(vec3, vec3, vec3), mix(vec4, vec4, vec4), got mix({:?}, {:?}. {:?}", self, y, a))
+        }
+    }
+
+    pub fn step(&self, x: Self) -> Result<Val, String> {
+        match (self, x) {
+            (Float(_), Float(_)) 
+                | (Vec2(_, _), Vec2(_, _)) 
+                | (Vec3(_, _, _), Vec3(_, _, _)) 
+                | (Vec4(_, _, _, _), Vec4(_, _, _, _)) 
+            => Ok(self.zipmap(x, |edge, x| if x < edge { 0.0 } else { 1.0 })),
+
+            (Float(a), Vec2(_, _)) 
+                | (Float(a), Vec3(_, _, _)) 
+                | (Float(a), Vec4(_, _, _, _)) 
+            => Ok(x.map(|x| if x < *a { 0.0 } else { 1.0 })),
+
+            _ => Err(format!("Expected step(float, float), step(float, vec2), step(float, vec3), step(float, vec4), step(vec2, vec2), step(vec3, vec3), step(vec4, vec4), got step({:?}, {:?})", self, x))
+        }
+    }
+
+    pub fn length(&self) -> Val {
+        let sum = match self.map(|x| x.powi(2)) {
+            Float(x) => x,
+            Vec2(x, y) => x + y,
+            Vec3(x, y, z) => x + y + z,
+            Vec4(x, y, z, w) => x + y + z + w
+        };
+
+        Float(sum.sqrt())
+    }
+
+    pub fn cross(&self, o: Self) -> Result<Val, String> {
+        match (self, o) {
+            (Vec3(x0, y0, z0), Vec3(x1, y1, z1)) => Ok(
+                Vec3(
+                    y0 * z1 - z0 * y1,
+                    z0 * x1 - x0 * z1,
+                    x0 * y1 - y0 * x1
+                )
+            ),
+            _ => Err(format!("Expected cross(vec3, vec3), got cross({:?}, {:?})", self, o))
+        }
+    }
+
+    pub fn norm(&self) -> Val {
+        self.zipmap(self.length(), |x, len| x / len)
     }
 }
 
@@ -249,7 +420,6 @@ fn need_val(v: Option<Val>) -> Val {
 
 pub fn eval(ast: &Ast, e: Env) -> EvalRet {
     use AstNode::*;
-    use Val::Float;
 
     match &ast.node {
         &V(v) => EvalRet::new(e).with_val(Some(v)),
@@ -438,7 +608,7 @@ pub fn eval(ast: &Ast, e: Env) -> EvalRet {
                             EvalRet::new(env).with_val(Some(Val::Vec4(radians(x), radians(y), radians(z), radians(w))))
                         }
                         (n, _) => report(ErrorType::Runtime, ast.line, format!("Expected 1 input to radians(a), got {}", n).as_str()),
-                        (_, v) => report(ErrorType::Runtime, ast.line, "Unexpected input to radians(a), expected float, vec2, vec3, vec4")
+                        _=> report(ErrorType::Runtime, ast.line, "Unexpected input to radians(a), expected float, vec2, vec3, vec4")
                     }
                 },
                 BuiltIn::Degrees => {

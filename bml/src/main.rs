@@ -21,9 +21,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
     let script_name = args.next().expect("Expected script name");
     let img_path = args.next().expect("Expected image path");
+    let eval_flag = args.next();
 
     if args.next().is_some() {
-        println!("Usage: bml [image] [script]");
+        println!("Usage: bml [image] [script] <options>");
         process::exit(1);
     }
 
@@ -37,11 +38,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let rti = RuntimeIdents::new(&mut rodeo);
     let mut env = ast::Env::default();
 
-    let output = eval(&ast, env, &rodeo).env.ret.take();
+    if let Some(flag) = eval_flag {
+        if flag == "--eval" {
+            let output = eval(&ast, env, &rodeo).env.ret.take();
 
-    println!("return={:?}", output);
+            println!("return={:?}", output);
 
-    process::exit(0);
+            process::exit(0);
+        } else {
+            println!("Invalid flag '{}' (expected '--eval')", flag);
+            
+            process::exit(1);
+        }
+    }
 
     let frame_count = std::env::var("BML_FRAME_COUNT")
         .ok()

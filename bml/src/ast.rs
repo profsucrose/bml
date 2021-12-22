@@ -42,6 +42,29 @@ pub enum Val {
 
 use Val::*;
 
+/*
+#[derive(PartialEq, Clone, Copy, Debug)]
+pub enum Vector {
+    Float(f32),
+    Vec2(f32, f32),
+    Vec3(f32, f32, f32),
+    Vec4(f32, f32, f32, f32),
+}
+
+#[derive(PartialEq, Clone, Copy, Debug)]
+pub enum Matrix {
+    Mat2(Vector, Vector),
+    Mat3(Vector, Vector, Vector),
+    Mat4(Vector, Vector, Vector, Vector),
+}
+
+#[derive(PartialEq, Clone, Copy, Debug)]
+pub enum Val {
+    Vector,
+    Matrix
+}
+*/
+
 mod math {
     pub fn rad(x: f32) -> f32 {
         x * std::f32::consts::PI / 180.0
@@ -300,6 +323,9 @@ impl Val {
 
 #[derive(Debug, Clone, Copy)]
 pub enum BuiltIn {
+    Mat2,
+    Mat3,
+    Mat4,
     Dist,
     Radians,
     Degrees,
@@ -606,6 +632,21 @@ pub fn eval(ast: &Ast, e: Env, r: &Rodeo) -> EvalRet {
                     });
 
             match *builtin {
+                BuiltIn::Mat2 => todo!(),
+                // BuiltIn::Mat2 => {
+                //     if len != 2 {
+                //         report(ErrorType::Runtime, ast.line, format!("Expected 2 inputs to mat2(vec2, vec2), got {}", len).as_str());
+                //     }
+
+                //     let mat = match (vals.pop(), vals.pop()) {
+                //         (Vec2(x0, y0), Vec2(x1, y1)) => Mat2(Vec2(x0, y0), Vec2(x1, y1)),
+                //         (x, y) => report(ErrorType::Runtime, ast.line, format!("Expected mat2(vec2, vec2), got mat2({:?}, {:?})", x, y).as_str())
+                //     };
+
+                //     EvalRet::new(env).with_val(Some(mat))
+                // },
+                BuiltIn::Mat3 => todo!(),
+                BuiltIn::Mat4 => todo!(),
                 BuiltIn::Dist => {
                     if len != 2 {
                         report(ErrorType::Runtime, ast.line, format!("Expected 2 inputs to dist(a, b), got {}", len).as_str())

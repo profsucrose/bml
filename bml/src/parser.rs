@@ -306,11 +306,14 @@ impl<'a> Parser<'a> {
             return self.number();
         }
 
-        self.vector()
+        if self.match_token(TokenType::LeftSquare) {
+            return self.vector();
+        }
+
+        report(ErrorType::Parse, self.peek().line, format!("Unexpected '{}' in expression", self.peek().lexeme).as_str())
     }
 
     fn vector(&mut self) -> Ast {
-        self.consume(TokenType::LeftSquare, "Expected '[' in vector literal");
 
         let first = self.r#if();
 

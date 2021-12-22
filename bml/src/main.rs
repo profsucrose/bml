@@ -1,7 +1,7 @@
 use std::process;
 
 use ast::Val;
-use bml::ast;
+use bml::ast::{self, eval};
 use image::io::Reader as ImageReader;
 
 macro_rules! gen_runtime_idents {
@@ -36,6 +36,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let rti = RuntimeIdents::new(&mut rodeo);
     let mut env = ast::Env::default();
+
+    let output = eval(&ast, env, &rodeo).env.ret.take();
+
+    println!("return={:?}", output);
+
+    process::exit(0);
 
     let frame_count = std::env::var("BML_FRAME_COUNT")
         .ok()

@@ -1,3 +1,5 @@
 # bml
 
-"Buffer Manipulation Language" - embeddable preprocessor/runtime for basic image manipulation
+## "Buffer Manipulation Language"
+
+Embeddable preprocessor/runtime for basic image manipulation

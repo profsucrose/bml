@@ -3,7 +3,16 @@
 macro add_one(a) a + 1
 macro neg(a) 0 - a
 
-return [add_one(10) + neg(10); 4]
+x = dist(
+    {
+        give 5
+    },
+    {
+        give 0.2
+    }
+)
+
+return [0; 4]
 
 # uv = coord / resolution
 

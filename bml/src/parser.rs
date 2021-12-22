@@ -7,27 +7,7 @@ use crate::logger::{report, ErrorType};
 use crate::token::Token;
 use crate::token_type::TokenType;
 
-// #[derive(Debug)]
-// pub enum Ast {
-//     V(Val),
-//     Assign(Spur, Box<Ast>), /* i32 will prolly become lasso::Spur */
-//     Block(Vec<Ast>),
-//     VecLiteral(Box<Ast>, Box<Ast>, Option<Box<Ast>>, Option<Box<Ast>>),
-//     VecAccess(Box<Ast>, Swizzle),
-//     Ident(Spur), /* will prolly become lasso::Spur */
-//     Return(Box<Ast>),
-//     Give(Box<Ast>),
-//     BinOp(Box<Ast>, Op, Box<Ast>),
-//     If {
-//         cond: Box<Ast>,
-//         true_ret: Box<Ast>,
-//         false_ret: Box<Ast>,
-//     },
-//     Call(BuiltIn, Vec<Ast>),
-// }
-
 /*
-
     precedence rules:
 
     stmt: expr if expr else expr | assign | "return" expr
@@ -62,6 +42,7 @@ impl<'a> Parser<'a> {
         builtins.insert(String::from("dist"), BuiltIn::Dist);
         builtins.insert(String::from("radians"), BuiltIn::Radians);
         builtins.insert(String::from("pow"), BuiltIn::Pow);
+        builtins.insert(String::from("sin"), BuiltIn::Sin);
 
         Parser {
             tokens,

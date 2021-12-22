@@ -1,0 +1,1 @@
+return [frag.g, frag.r, frag.b, 1] # new script

@@ -148,6 +148,23 @@ impl Val {
     pub fn ceil(&self) -> Val { self.map(f32::ceil) }
     pub fn fract(&self) -> Val { self.map(f32::fract) }
 
+    pub fn pow(&self, exp: Val) -> Result<Val, String> {
+        match (self, exp) {
+            (Float(_), Float(_)) 
+                | (Vec2(_, _), Vec2(_, _))
+                | (Vec3(_, _, _), Vec3(_, _, _))
+                | (Vec4(_, _, _, _), Vec4(_, _, _, _))
+            => Ok(self.zipmap(exp, |x, exp| x.powf(exp))),
+
+            (Vec2(_, _), Float(exp))
+                | (Vec3(_, _, _), Float(exp))
+                | (Vec4(_, _, _, _), Float(exp))
+            => Ok(self.map(|x| x.powf(exp))),
+
+            _ => Err(format!("Expected pow(float, float), pow(vec2, vec2), pow(vec3, vec3), pow(vec4, vec4), pow(vec2, float), pow(vec3, float), pow(vec4, float), got pow({:?}, {:?}", self, exp))
+        }
+    }
+
     pub fn dot(&self, o: Self) -> Result<Val, String> {
         match (self, o) {
             (Vec2(x0, y0), Vec2(x1, y1)) => Ok(Float(x0 * x1 + y0 * y1)),
@@ -250,6 +267,17 @@ impl Val {
         };
 
         Float(sum.sqrt())
+    }
+
+    pub fn dist(&self, o: Self) -> Result<Val, String> {
+        match (self, o) {
+            (Float(_), Float(_)) 
+                | (Vec2(_, _), Vec2(_, _)) 
+                | (Vec3(_, _, _), Vec3(_, _, _)) 
+                | (Vec4(_, _, _, _), Vec4(_, _, _, _)) 
+            => Ok(self.zipmap(o, |x, y| x - y).length()),
+            _ => Err(format!("Expected dist(float, float), dist(vec2, vec2), dist(vec3, vec3), dist(vec4, vec4), got dist({:?}, {:?})", self, o))
+        }
     }
 
     pub fn cross(&self, o: Self) -> Result<Val, String> {
@@ -491,9 +519,11 @@ pub fn eval(ast: &Ast, e: Env, r: &Rodeo) -> EvalRet {
         }
         VecAccess(access_me, swiz) => {
             let ERVal { env, val } = eval(&access_me, e, r).needs_val();
+
             if let Val::Float(x) = val {
-                panic!("Expected vec, found {}", x)
+                report(ErrorType::Runtime, ast.line, format!("Expected vector when swizzling, got {}", x).as_str());
             }
+
             EvalRet::new(env).with_val(Some(match *swiz {
                 Swizzle(x, None, None, None) => Val::Float(val.get_field(x)),
                 Swizzle(x, Some(y), None, None) => Val::Vec2(val.get_field(x), val.get_field(y)),
@@ -577,81 +607,36 @@ pub fn eval(ast: &Ast, e: Env, r: &Rodeo) -> EvalRet {
 
             match *builtin {
                 BuiltIn::Dist => {
-                    match (len, vals.pop(), vals.pop()) {
-                        (2, Some(Val::Float(x0)), Some(Val::Float(x1))) => {
-                            EvalRet::new(env).with_val(Some(Val::Float((x1 - x0).abs())))
-                        }
-                        (2, Some(Val::Vec2(x0, y0)), Some(Val::Vec2(x1, y1))) => {
-                            EvalRet::new(env).with_val(Some(Val::Float(((x1 - x0).powi(2) + (y1 - y0).powi(2)).sqrt())))
-                        } 
-                        (2, Some(Val::Vec3(x0, y0, z0)), Some(Val::Vec3(x1, y1, z1))) => {
-                            EvalRet::new(env).with_val(Some(Val::Float(((x1 - x0).powi(2) + (y1 - y0).powi(2) + (z1 - z0).powi(2)).sqrt())))
-                        }
-                        (2, Some(Val::Vec4(x0, y0, z0, w0)), Some(Val::Vec4(x1, y1, z1, w1))) => {
-                            EvalRet::new(env).with_val(Some(Val::Float(((x1 - x0).powi(2) + (y1 - y0).powi(2) + (z1 - z0).powi(2) + (w1 - w0).powi(2)).sqrt())))
-                        }
-                        (2, v1, v2) => report(ErrorType::Runtime, ast.line, format!("Unexpected inputs to dist(a, b), got {:#?} and {:#?}", v1, v2).as_str()),
-                        (n, _, _) => report(ErrorType::Runtime, ast.line, format!("Expected 2 inputs to dist(a, b), got {}", n).as_str())
+                    if len != 2 {
+                        report(ErrorType::Runtime, ast.line, format!("Expected 2 inputs to dist(a, b), got {}", len).as_str())
                     }
+
+                    let distance = match vals.pop().unwrap().dist(vals.pop().unwrap()) {
+                        Ok(distance) => distance,
+                        Err(error) => report(ErrorType::Runtime, ast.line, error.as_str())
+                    };
+
+                    EvalRet::new(env).with_val(Some(distance))
+               }
+                BuiltIn::Sin => {
+                    if len != 1 {
+                        report(ErrorType::Runtime, ast.line, format!("Expected 1 input to sin(a), got {}", len).as_str())
+                    }
+
+                    EvalRet::new(env).with_val(Some(vals.pop().unwrap().sin()))
                 }
-                BuiltIn::Radians => {
-                    let radians = |deg: f32| deg * std::f32::consts::PI / 180.0;
-
-                    match (len, vals.pop()) {
-                        (1, Some(Val::Float(x))) => {
-                            EvalRet::new(env).with_val(Some(Val::Float(radians(x))))
-                        }
-                        (1, Some(Val::Vec2(x, y))) => {
-                            EvalRet::new(env).with_val(Some(Val::Vec2(radians(x), radians(y))))
-                        }
-                        (1, Some(Val::Vec3(x, y, z))) => {
-                            EvalRet::new(env).with_val(Some(Val::Vec3(radians(x), radians(y), radians(z))))
-                        }
-                        (1, Some(Val::Vec4(x, y, z, w))) => {
-                            EvalRet::new(env).with_val(Some(Val::Vec4(radians(x), radians(y), radians(z), radians(w))))
-                        }
-                        (1, _) => report(ErrorType::Runtime, ast.line, "Unexpected input to radians(a), expected float, vec2, vec3, vec4"),
-                        (n, _) => report(ErrorType::Runtime, ast.line, format!("Expected 1 input to radians(a), got {}", n).as_str())
-                    }
-                },
-                BuiltIn::Degrees => {
-                    let degrees = |rad: f32| rad * 180.0 / std::f32::consts::PI;
-
-                    match (len, vals.pop()) {
-                        (1, Some(Val::Float(x))) => {
-                            EvalRet::new(env).with_val(Some(Val::Float(degrees(x))))
-                        }
-                        (1, Some(Val::Vec2(x, y))) => {
-                            EvalRet::new(env).with_val(Some(Val::Vec2(degrees(x), degrees(y))))
-                        }
-                        (1, Some(Val::Vec3(x, y, z))) => {
-                            EvalRet::new(env).with_val(Some(Val::Vec3(degrees(x), degrees(y), degrees(z))))
-                        }
-                        (1, Some(Val::Vec4(x, y, z, w))) => {
-                            EvalRet::new(env).with_val(Some(Val::Vec4(degrees(x), degrees(y), degrees(z), degrees(w))))
-                        }
-                        _ => report(ErrorType::Runtime, ast.line, "Unexpected inputs to radians(), expected float, vec2, vec3, vec4")
-                    }
-                },
                 BuiltIn::Pow => {
-                    match (len, vals.pop(), vals.pop()) {
-                        (2, Some(Val::Float(x)), Some(Val::Float(exp))) => {
-                            EvalRet::new(env).with_val(Some(Val::Float(x.powf(exp))))
-                        }
-                        (2, Some(Val::Vec2(x, y)), Some(Val::Float(exp))) => {
-                            EvalRet::new(env).with_val(Some(Val::Vec2(x.powf(exp), y.powf(exp))))
-                        }
-                        (2, Some(Val::Vec3(x, y, z)), Some(Val::Float(exp))) => {
-                            EvalRet::new(env).with_val(Some(Val::Vec3(x.powf(exp), y.powf(exp), z.powf(exp))))
-                        }
-                        (2, Some(Val::Vec4(x, y, z, w)), Some(Val::Float(exp))) => {
-                            EvalRet::new(env).with_val(Some(Val::Vec4(x.powf(exp), y.powf(exp), z.powf(exp), w.powf(exp))))
-                        }
-                        (2, x, exp) => report(ErrorType::Runtime, ast.line, format!("Expected pow(vec*, float), got {:?}, {:?}", x, exp).as_str()),
-                        (n, _, _) => report(ErrorType::Runtime, ast.line, format!("Expected two inputs to pow(), got {}", n).as_str())
+                    if len != 2 {
+                        report(ErrorType::Runtime, ast.line, format!("Expected 2 inputs to pow(a, b), got {}", len).as_str())
                     }
-                },
-                BuiltIn::Sin => todo!(),
+
+                    let pow = match vals.pop().unwrap().dist(vals.pop().unwrap()) {
+                        Ok(distance) => distance,
+                        Err(error) => report(ErrorType::Runtime, ast.line, error.as_str())
+                    };
+
+                    EvalRet::new(env).with_val(Some(pow)) 
+                }
                 BuiltIn::Cos => todo!(),
                 BuiltIn::Tan => todo!(),
                 BuiltIn::Asin => todo!(),
@@ -677,6 +662,8 @@ pub fn eval(ast: &Ast, e: Env, r: &Rodeo) -> EvalRet {
                 BuiltIn::Dot => todo!(),
                 BuiltIn::Cross => todo!(),
                 BuiltIn::Norm => todo!(),
+                BuiltIn::Radians => todo!(),
+                BuiltIn::Degrees => todo!(),
             }
         }
     }

@@ -6,6 +6,10 @@ macro neg(a) 0.0 - a
 macro and(a, b) a * b
 macro or(a, b) min(1, a + b)
 
+macro taxicab(a, b) {
+    abs(a.x - b.x) - abs(a.y - b.y)
+}
+
 macro should_negate_s(vj, vi) {
     e = vj - vi
     w = p - vi

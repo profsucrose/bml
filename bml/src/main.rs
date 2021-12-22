@@ -19,8 +19,8 @@ gen_runtime_idents!(resolution, coord, frag, frame, frame_count);
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
-    let script_name = args.next().expect("expected script name");
-    let img_path = args.next().expect("expected image path");
+    let script_name = args.next().expect("Expected script name");
+    let img_path = args.next().expect("Expected image path");
 
     if args.next().is_some() {
         println!("Usage: bml [image] [script]");

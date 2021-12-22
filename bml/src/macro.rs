@@ -2,16 +2,11 @@ use std::collections::HashMap;
 
 use crate::{token::Token, token_type::TokenType};
 
-// macro dot(a, b) a.x * b.x + a.y * b.y
-// (r, b) r.r * b.x + a.y * b.y
-// dot([0, 1] + [1, 1], [2, 2]) a.r * b.x + a.y * b.y
-
 pub struct Macro {
     keys: Vec<String>,
     template: Vec<(TokenType, String)>,
 }
 
-// TODO: add string interning
 impl Macro {
     pub fn new(keys: Vec<String>, template: Vec<(TokenType, String)>) -> Macro {
         Macro { keys, template }

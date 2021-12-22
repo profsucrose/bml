@@ -1,9 +1,7 @@
-/target
+**/target
 *.swp
 *.swo
-<<<<<<< HEAD
-.vscode
-=======
 *.png
 *.gif
->>>>>>> ast
+.vscode
+node_modules

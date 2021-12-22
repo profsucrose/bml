@@ -1,4 +1,4 @@
-use lasso::{Spur, Rodeo};
+use lasso::{Rodeo, Spur};
 use std::collections::HashMap;
 
 use crate::logger::{report, ErrorType};
@@ -78,7 +78,7 @@ mod math {
         let i = x.to_bits();
         let i = 0x5f3759df - (i >> 1);
         let y = f32::from_bits(i);
-    
+
         y * (1.5 - 0.5 * x * y * y)
     }
 
@@ -101,9 +101,19 @@ impl Val {
         match (self, o1, o2) {
             (Float(x), Float(y), Float(z)) => Float(f(x, y, z)),
             (Vec2(x0, x1), Vec2(y0, y1), Vec2(z0, z1)) => Vec2(f(x0, y0, z0), f(x1, y1, z1)),
-            (Vec3(x0, x1, x2), Vec3(y0, y1, y2), Vec3(z0, z1, z2)) => Vec3(f(x0, y0, z0), f(x1, y1, z1), f(x2, y2, z2)),
-            (Vec4(x0, x1, x2, x3), Vec4(y0, y1, y2, y3), Vec4(z0, z1, z2, z3)) => Vec4(f(x0, y0, z0), f(x1, y1, z1), f(x2, y2, z2), f(x3, y3, z3)),
-            _ => panic!("{}", format!("expected all args to zipmap3 be same type, got {:?}, {:?}, {:?}", self, o1, o2))
+            (Vec3(x0, x1, x2), Vec3(y0, y1, y2), Vec3(z0, z1, z2)) => {
+                Vec3(f(x0, y0, z0), f(x1, y1, z1), f(x2, y2, z2))
+            }
+            (Vec4(x0, x1, x2, x3), Vec4(y0, y1, y2, y3), Vec4(z0, z1, z2, z3)) => {
+                Vec4(f(x0, y0, z0), f(x1, y1, z1), f(x2, y2, z2), f(x3, y3, z3))
+            }
+            _ => panic!(
+                "{}",
+                format!(
+                    "expected all args to zipmap3 be same type, got {:?}, {:?}, {:?}",
+                    self, o1, o2
+                )
+            ),
         }
     }
 
@@ -153,27 +163,61 @@ impl Val {
         }
     }
 
-    pub fn radians(&self) -> Val { self.map(math::rad) }
-    pub fn degrees(&self) -> Val { self.map(math::deg) }
-    pub fn sin(&self) -> Val { self.map(f32::sin) }
-    pub fn cos(&self) -> Val { self.map(f32::cos) }
-    pub fn tan(&self) -> Val { self.map(f32::tan) }
-    pub fn asin(&self) -> Val { self.map(f32::asin) }
-    pub fn acos(&self) -> Val { self.map(f32::acos) }
-    pub fn atan(&self) -> Val { self.map(f32::atan) }
-    pub fn exp(&self) -> Val { self.map(f32::exp) }
-    pub fn log(&self) -> Val { self.map(|x| f32::log(std::f32::consts::E, x)) }
-    pub fn sqrt(&self) -> Val { self.map(f32::sqrt) }
-    pub fn invsqrt(&self) -> Val { self.map(math::inv_sqrt) }
-    pub fn abs(&self) -> Val { self.map(f32::abs) }
-    pub fn sign(&self) -> Val { self.map(f32::signum) }
-    pub fn floor(&self) -> Val { self.map(f32::floor) }
-    pub fn ceil(&self) -> Val { self.map(f32::ceil) }
-    pub fn fract(&self) -> Val { self.map(f32::fract) }
+    pub fn radians(&self) -> Val {
+        self.map(math::rad)
+    }
+    pub fn degrees(&self) -> Val {
+        self.map(math::deg)
+    }
+    pub fn sin(&self) -> Val {
+        self.map(f32::sin)
+    }
+    pub fn cos(&self) -> Val {
+        self.map(f32::cos)
+    }
+    pub fn tan(&self) -> Val {
+        self.map(f32::tan)
+    }
+    pub fn asin(&self) -> Val {
+        self.map(f32::asin)
+    }
+    pub fn acos(&self) -> Val {
+        self.map(f32::acos)
+    }
+    pub fn atan(&self) -> Val {
+        self.map(f32::atan)
+    }
+    pub fn exp(&self) -> Val {
+        self.map(f32::exp)
+    }
+    pub fn log(&self) -> Val {
+        self.map(|x| f32::log(std::f32::consts::E, x))
+    }
+    pub fn sqrt(&self) -> Val {
+        self.map(f32::sqrt)
+    }
+    pub fn invsqrt(&self) -> Val {
+        self.map(math::inv_sqrt)
+    }
+    pub fn abs(&self) -> Val {
+        self.map(f32::abs)
+    }
+    pub fn sign(&self) -> Val {
+        self.map(f32::signum)
+    }
+    pub fn floor(&self) -> Val {
+        self.map(f32::floor)
+    }
+    pub fn ceil(&self) -> Val {
+        self.map(f32::ceil)
+    }
+    pub fn fract(&self) -> Val {
+        self.map(f32::fract)
+    }
 
     pub fn pow(&self, exp: Val) -> Result<Val, String> {
         match (self, exp) {
-            (Float(_), Float(_)) 
+            (Float(_), Float(_))
                 | (Vec2(_, _), Vec2(_, _))
                 | (Vec3(_, _, _), Vec3(_, _, _))
                 | (Vec4(_, _, _, _), Vec4(_, _, _, _))
@@ -191,15 +235,20 @@ impl Val {
     pub fn dot(&self, o: Self) -> Result<Val, String> {
         match (self, o) {
             (Vec2(x0, y0), Vec2(x1, y1)) => Ok(Float(x0 * x1 + y0 * y1)),
-            (Vec3(x0, y0, z0), Vec3(x1, y1, z1)) => Ok(Float(x0  * x1 + y0 * y1 + z0 * z1)),
-            (Vec4(x0, y0, z0, w0), Vec4(x1, y1, z1, w1)) => Ok(Float(x0 * x1 + y0 * y1 + z0 * z1 + w0 + w1)),
-            _ => Err(format!("Expected dot(vec2, vec2), dot(vec3, vec3), dot(vec4, vec4), got dot({:?}, {:?})", self, o))
+            (Vec3(x0, y0, z0), Vec3(x1, y1, z1)) => Ok(Float(x0 * x1 + y0 * y1 + z0 * z1)),
+            (Vec4(x0, y0, z0, w0), Vec4(x1, y1, z1, w1)) => {
+                Ok(Float(x0 * x1 + y0 * y1 + z0 * z1 + w0 + w1))
+            }
+            _ => Err(format!(
+                "Expected dot(vec2, vec2), dot(vec3, vec3), dot(vec4, vec4), got dot({:?}, {:?})",
+                self, o
+            )),
         }
     }
 
-    pub fn modulo(&self, o: Self) -> Result<Val, String> { 
+    pub fn modulo(&self, o: Self) -> Result<Val, String> {
         match (self, o) {
-            (Float(_), Float(_)) 
+            (Float(_), Float(_))
                 | (Vec2(_, _), Vec2(_, _))
                 | (Vec3(_, _, _), Vec3(_, _, _))
                 | (Vec4(_, _, _, _), Vec4(_, _, _, _))
@@ -208,9 +257,9 @@ impl Val {
         }
     }
 
-    pub fn min(&self, val: &Val) -> Result<Val, String> { 
+    pub fn min(&self, val: &Val) -> Result<Val, String> {
         match (self, val) {
-            (Float(_), Float(_)) 
+            (Float(_), Float(_))
                 | (Vec2(_, _), Vec2(_, _))
                 | (Vec3(_, _, _), Vec3(_, _, _))
                 | (Vec4(_, _, _, _), Vec4(_, _, _, _))
@@ -219,9 +268,9 @@ impl Val {
         }
     }
 
-    pub fn max(&self, val: &Val) -> Result<Val, String> { 
+    pub fn max(&self, val: &Val) -> Result<Val, String> {
         match (self, val) {
-            (Float(_), Float(_)) 
+            (Float(_), Float(_))
                 | (Vec2(_, _), Vec2(_, _))
                 | (Vec3(_, _, _), Vec3(_, _, _))
                 | (Vec4(_, _, _, _), Vec4(_, _, _, _))
@@ -232,7 +281,7 @@ impl Val {
 
     pub fn clamp(&self, min: Self, max: Self) -> Result<Val, String> {
         match (self, min, max) {
-            (Float(_), Float(_), Float(_)) 
+            (Float(_), Float(_), Float(_))
                 | (Vec2(_, _), Vec2(_, _), Vec2(_, _))
                 | (Vec3(_, _, _), Vec3(_, _, _), Vec3(_, _, _))
                 | (Vec4(_, _, _, _), Vec4(_, _, _, _), Vec4(_, _, _, _))
@@ -241,7 +290,7 @@ impl Val {
             (Vec2(_, _), Vec2(_, _), Float(a))
                 | (Vec3(_, _, _), Vec3(_, _, _), Float(a))
                 | (Vec4(_, _, _, _), Vec4(_, _, _, _), Float(a))
-            => Ok(self.zipmap3(min, Vec4(a, a, a, a), |x, y, z| x.clamp(y, z))), 
+            => Ok(self.zipmap3(min, Vec4(a, a, a, a), |x, y, z| x.clamp(y, z))),
 
             _ => Err(format!("Expected clamp(float, float, float), clamp(vec2, vec2, vec2), clamp(vec3, vec3, vec3), clamp(vec4, vec4, vec4), got clamp({:?}, {:?}, {:?})", self, min, max))
         }
@@ -249,7 +298,7 @@ impl Val {
 
     pub fn mix(&self, y: Self, a: Self) -> Result<Val, String> {
         match (self, y, a) {
-            (Float(_), Float(_), Float(_)) 
+            (Float(_), Float(_), Float(_))
                 | (Vec2(_, _), Vec2(_, _), Vec2(_, _))
                 | (Vec3(_, _, _), Vec3(_, _, _), Vec3(_, _, _))
                 | (Vec4(_, _, _, _), Vec4(_, _, _, _), Vec4(_, _, _, _))
@@ -266,15 +315,15 @@ impl Val {
 
     pub fn step(&self, x: Self) -> Result<Val, String> {
         match (self, x) {
-            (Float(_), Float(_)) 
-                | (Vec2(_, _), Vec2(_, _)) 
-                | (Vec3(_, _, _), Vec3(_, _, _)) 
-                | (Vec4(_, _, _, _), Vec4(_, _, _, _)) 
+            (Float(_), Float(_))
+                | (Vec2(_, _), Vec2(_, _))
+                | (Vec3(_, _, _), Vec3(_, _, _))
+                | (Vec4(_, _, _, _), Vec4(_, _, _, _))
             => Ok(self.zipmap(x, |edge, x| if x < edge { 0.0 } else { 1.0 })),
 
-            (Float(a), Vec2(_, _)) 
-                | (Float(a), Vec3(_, _, _)) 
-                | (Float(a), Vec4(_, _, _, _)) 
+            (Float(a), Vec2(_, _))
+                | (Float(a), Vec3(_, _, _))
+                | (Float(a), Vec4(_, _, _, _))
             => Ok(x.map(|x| if x < *a { 0.0 } else { 1.0 })),
 
             _ => Err(format!("Expected step(float, float), step(float, vec2), step(float, vec3), step(float, vec4), step(vec2, vec2), step(vec3, vec3), step(vec4, vec4), got step({:?}, {:?})", self, x))
@@ -286,7 +335,7 @@ impl Val {
             Float(x) => x,
             Vec2(x, y) => x + y,
             Vec3(x, y, z) => x + y + z,
-            Vec4(x, y, z, w) => x + y + z + w
+            Vec4(x, y, z, w) => x + y + z + w,
         };
 
         Float(sum.sqrt())
@@ -294,10 +343,10 @@ impl Val {
 
     pub fn dist(&self, o: Self) -> Result<Val, String> {
         match (self, o) {
-            (Float(_), Float(_)) 
-                | (Vec2(_, _), Vec2(_, _)) 
-                | (Vec3(_, _, _), Vec3(_, _, _)) 
-                | (Vec4(_, _, _, _), Vec4(_, _, _, _)) 
+            (Float(_), Float(_))
+                | (Vec2(_, _), Vec2(_, _))
+                | (Vec3(_, _, _), Vec3(_, _, _))
+                | (Vec4(_, _, _, _), Vec4(_, _, _, _))
             => Ok(self.zipmap(o, |x, y| x - y).length()),
             _ => Err(format!("Expected dist(float, float), dist(vec2, vec2), dist(vec3, vec3), dist(vec4, vec4), got dist({:?}, {:?})", self, o))
         }
@@ -305,14 +354,15 @@ impl Val {
 
     pub fn cross(&self, o: Self) -> Result<Val, String> {
         match (self, o) {
-            (Vec3(x0, y0, z0), Vec3(x1, y1, z1)) => Ok(
-                Vec3(
-                    y0 * z1 - z0 * y1,
-                    z0 * x1 - x0 * z1,
-                    x0 * y1 - y0 * x1
-                )
-            ),
-            _ => Err(format!("Expected cross(vec3, vec3), got cross({:?}, {:?})", self, o))
+            (Vec3(x0, y0, z0), Vec3(x1, y1, z1)) => Ok(Vec3(
+                y0 * z1 - z0 * y1,
+                z0 * x1 - x0 * z1,
+                x0 * y1 - y0 * x1,
+            )),
+            _ => Err(format!(
+                "Expected cross(vec3, vec3), got cross({:?}, {:?})",
+                self, o
+            )),
         }
     }
 
@@ -355,7 +405,7 @@ pub enum BuiltIn {
     Length,
     Dot,
     Cross,
-    Norm
+    Norm,
 }
 
 #[derive(Debug, Clone)]
@@ -498,17 +548,19 @@ pub fn eval(ast: &Ast, e: Env, r: &Rodeo) -> EvalRet {
             let ERVal { val: length, env } = eval(length, env, r).needs_val();
 
             match (value, length) {
-                (Float(v), Float(l)) => {
-                    match l as usize {
-                        2 => EvalRet::new(env).with_val(Some(Val::Vec2(v, v))),
-                        3 => EvalRet::new(env).with_val(Some(Val::Vec3(v, v, v))),
-                        4 => EvalRet::new(env).with_val(Some(Val::Vec4(v, v, v, v))),
-                        n => {
-                            panic!("{} is an invalid vector length; must be 2 <= x <= 4", n)
-                        }
+                (Float(v), Float(l)) => match l as usize {
+                    2 => EvalRet::new(env).with_val(Some(Val::Vec2(v, v))),
+                    3 => EvalRet::new(env).with_val(Some(Val::Vec3(v, v, v))),
+                    4 => EvalRet::new(env).with_val(Some(Val::Vec4(v, v, v, v))),
+                    n => {
+                        panic!("{} is an invalid vector length; must be 2 <= x <= 4", n)
                     }
-                }
-                _ => report(ErrorType::Runtime, ast.line, "Both X and L in [X; L] in vector literal must evaluate to scalars"),
+                },
+                _ => report(
+                    ErrorType::Runtime,
+                    ast.line,
+                    "Both X and L in [X; L] in vector literal must evaluate to scalars",
+                ),
             }
         }
         VecLiteral(xast, yast, None, None) => {
@@ -547,7 +599,11 @@ pub fn eval(ast: &Ast, e: Env, r: &Rodeo) -> EvalRet {
             let ERVal { env, val } = eval(&access_me, e, r).needs_val();
 
             if let Val::Float(x) = val {
-                report(ErrorType::Runtime, ast.line, format!("Expected vector when swizzling, got {}", x).as_str());
+                report(
+                    ErrorType::Runtime,
+                    ast.line,
+                    format!("Expected vector when swizzling, got {}", x).as_str(),
+                );
             }
 
             EvalRet::new(env).with_val(Some(match *swiz {
@@ -562,15 +618,19 @@ pub fn eval(ast: &Ast, e: Env, r: &Rodeo) -> EvalRet {
                     val.get_field(z),
                     val.get_field(w),
                 ),
-                _ => report(ErrorType::Runtime, ast.line, "Invalid swizzle")
+                _ => report(ErrorType::Runtime, ast.line, "Invalid swizzle"),
             }))
         }
         &Ident(i) => {
             if let Some(val) = e.get(i) {
-                return EvalRet::new(e).with_val(Some(val))
+                return EvalRet::new(e).with_val(Some(val));
             }
 
-            report(ErrorType::Runtime, ast.line, format!("Couldn't resolve identifier '{}'", r.resolve(&i)).as_str())
+            report(
+                ErrorType::Runtime,
+                ast.line,
+                format!("Couldn't resolve identifier '{}'", r.resolve(&i)).as_str(),
+            )
         }
         Return(v) => {
             let ERVal { mut env, val } = eval(&v, e, r).needs_val();
@@ -618,7 +678,15 @@ pub fn eval(ast: &Ast, e: Env, r: &Rodeo) -> EvalRet {
             match condval {
                 Val::Float(f) if f == 1.0 => eval(&true_ret, env, r),
                 Val::Float(_) => eval(&false_ret, env, r),
-                _ => report(ErrorType::Runtime, ast.line, format!("Expected scalar conditional in if expression, got {:#?}", condval).as_str()),
+                _ => report(
+                    ErrorType::Runtime,
+                    ast.line,
+                    format!(
+                        "Expected scalar conditional in if expression, got {:#?}",
+                        condval
+                    )
+                    .as_str(),
+                ),
             }
         }
         Call(builtin, args) => {
@@ -649,34 +717,46 @@ pub fn eval(ast: &Ast, e: Env, r: &Rodeo) -> EvalRet {
                 BuiltIn::Mat4 => todo!(),
                 BuiltIn::Dist => {
                     if len != 2 {
-                        report(ErrorType::Runtime, ast.line, format!("Expected 2 inputs to dist(a, b), got {}", len).as_str())
+                        report(
+                            ErrorType::Runtime,
+                            ast.line,
+                            format!("Expected 2 inputs to dist(a, b), got {}", len).as_str(),
+                        )
                     }
 
                     let distance = match vals.pop().unwrap().dist(vals.pop().unwrap()) {
                         Ok(distance) => distance,
-                        Err(error) => report(ErrorType::Runtime, ast.line, error.as_str())
+                        Err(error) => report(ErrorType::Runtime, ast.line, error.as_str()),
                     };
 
                     EvalRet::new(env).with_val(Some(distance))
-               }
+                }
                 BuiltIn::Sin => {
                     if len != 1 {
-                        report(ErrorType::Runtime, ast.line, format!("Expected 1 input to sin(a), got {}", len).as_str())
+                        report(
+                            ErrorType::Runtime,
+                            ast.line,
+                            format!("Expected 1 input to sin(a), got {}", len).as_str(),
+                        )
                     }
 
                     EvalRet::new(env).with_val(Some(vals.pop().unwrap().sin()))
                 }
                 BuiltIn::Pow => {
                     if len != 2 {
-                        report(ErrorType::Runtime, ast.line, format!("Expected 2 inputs to pow(a, b), got {}", len).as_str())
+                        report(
+                            ErrorType::Runtime,
+                            ast.line,
+                            format!("Expected 2 inputs to pow(a, b), got {}", len).as_str(),
+                        )
                     }
 
                     let pow = match vals.pop().unwrap().dist(vals.pop().unwrap()) {
                         Ok(distance) => distance,
-                        Err(error) => report(ErrorType::Runtime, ast.line, error.as_str())
+                        Err(error) => report(ErrorType::Runtime, ast.line, error.as_str()),
                     };
 
-                    EvalRet::new(env).with_val(Some(pow)) 
+                    EvalRet::new(env).with_val(Some(pow))
                 }
                 BuiltIn::Cos => todo!(),
                 BuiltIn::Tan => todo!(),

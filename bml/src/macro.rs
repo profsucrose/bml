@@ -14,14 +14,20 @@ impl Macro {
 
     pub fn expand(&self, line: usize, args: Vec<Vec<Token>>) -> Vec<Token> {
         // dot(a, b)
-        let symbols = self.keys.clone().into_iter().zip(args.into_iter()).collect::<HashMap<_, _>>();
+        let symbols = self
+            .keys
+            .clone()
+            .into_iter()
+            .zip(args.into_iter())
+            .collect::<HashMap<_, _>>();
 
-        self.template.clone().into_iter().flat_map(
-                |(t, s)| match (t, symbols.get(&s)) {
-                    (TokenType::Identifier, Some(expansion)) => expansion.clone(),
-                    _ => vec![Token::new(t, s, line)]
-                }
-            )
+        self.template
+            .clone()
+            .into_iter()
+            .flat_map(|(t, s)| match (t, symbols.get(&s)) {
+                (TokenType::Identifier, Some(expansion)) => expansion.clone(),
+                _ => vec![Token::new(t, s, line)],
+            })
             .collect::<Vec<Token>>()
     }
 }

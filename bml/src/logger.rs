@@ -6,7 +6,7 @@ use colored::Colorize;
 pub enum ErrorType {
     Parse,
     Preprocessor,
-    Runtime
+    Runtime,
 }
 
 pub fn info(message: &str) {

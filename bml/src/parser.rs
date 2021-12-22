@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use lasso::{Rodeo, Spur};
 
-use crate::ast::{Ast, BuiltIn, Field, Op, Swizzle, Val, AstNode};
+use crate::ast::{Ast, AstNode, BuiltIn, Field, Op, Swizzle, Val};
 use crate::logger::{report, ErrorType};
 use crate::token::Token;
 use crate::token_type::TokenType;
@@ -92,7 +92,7 @@ impl<'a> Parser<'a> {
                     true_ret: Box::new(expression),
                     false_ret: Box::new(false_ret),
                 },
-                self.previous().line
+                self.previous().line,
             );
         }
 
@@ -112,12 +112,15 @@ impl<'a> Parser<'a> {
 
         let initializer = self.r#if();
 
-        Ast::new(AstNode::Assign(self.identifier(name), Box::new(initializer)), self.previous().line)
+        Ast::new(
+            AstNode::Assign(self.identifier(name), Box::new(initializer)),
+            self.previous().line,
+        )
     }
 
     fn expression(&mut self) -> Ast {
-        if self.match_token(TokenType::LeftBracket) { 
-            return self.block(); 
+        if self.match_token(TokenType::LeftBracket) {
+            return self.block();
         }
 
         self.equality()
@@ -138,7 +141,10 @@ impl<'a> Parser<'a> {
 
             let right = self.comparison();
 
-            equality = Ast::new(AstNode::BinOp(Box::new(equality), operator, Box::new(right)), self.previous().line);
+            equality = Ast::new(
+                AstNode::BinOp(Box::new(equality), operator, Box::new(right)),
+                self.previous().line,
+            );
         }
 
         equality
@@ -173,15 +179,18 @@ impl<'a> Parser<'a> {
                 );
             }
 
-            access = Ast::new(AstNode::VecAccess(
-                Box::new(access),
-                Swizzle(
-                    *accessors.get(0).unwrap(),
-                    accessors.get(1).copied(),
-                    accessors.get(2).copied(),
-                    accessors.get(3).copied(),
+            access = Ast::new(
+                AstNode::VecAccess(
+                    Box::new(access),
+                    Swizzle(
+                        *accessors.get(0).unwrap(),
+                        accessors.get(1).copied(),
+                        accessors.get(2).copied(),
+                        accessors.get(3).copied(),
+                    ),
                 ),
-            ), self.previous().line);
+                self.previous().line,
+            );
         }
 
         access
@@ -212,7 +221,10 @@ impl<'a> Parser<'a> {
 
             let right = self.term();
 
-            term = Ast::new(AstNode::BinOp(Box::new(term), op, Box::new(right)), self.previous().line);
+            term = Ast::new(
+                AstNode::BinOp(Box::new(term), op, Box::new(right)),
+                self.previous().line,
+            );
         }
 
         term
@@ -241,7 +253,10 @@ impl<'a> Parser<'a> {
 
             let right = self.factor();
 
-            factor = Ast::new(AstNode::BinOp(Box::new(factor), op, Box::new(right)), self.previous().line);
+            factor = Ast::new(
+                AstNode::BinOp(Box::new(factor), op, Box::new(right)),
+                self.previous().line,
+            );
         }
 
         factor
@@ -270,7 +285,10 @@ impl<'a> Parser<'a> {
 
             let right = self.access();
 
-            primary = Ast::new(AstNode::BinOp(Box::new(primary), op, Box::new(right)), self.previous().line);
+            primary = Ast::new(
+                AstNode::BinOp(Box::new(primary), op, Box::new(right)),
+                self.previous().line,
+            );
         }
 
         primary
@@ -290,7 +308,13 @@ impl<'a> Parser<'a> {
             self.consume(TokenType::RightParen, "Expect ')' after expression");
 
             // handle parenthesis
-            return Ast::new(AstNode::Block(vec![Ast::new(AstNode::Give(Box::new(expression)), self.previous().line)]), self.previous().line);
+            return Ast::new(
+                AstNode::Block(vec![Ast::new(
+                    AstNode::Give(Box::new(expression)),
+                    self.previous().line,
+                )]),
+                self.previous().line,
+            );
         }
 
         if self.match_token(TokenType::Identifier) {
@@ -310,15 +334,21 @@ impl<'a> Parser<'a> {
             return self.vector();
         }
 
-        report(ErrorType::Parse, self.peek().line, format!("Unexpected '{}' in expression", self.peek().lexeme).as_str())
+        report(
+            ErrorType::Parse,
+            self.peek().line,
+            format!("Unexpected '{}' in expression", self.peek().lexeme).as_str(),
+        )
     }
 
     fn vector(&mut self) -> Ast {
-
         let first = self.r#if();
 
         if self.match_token(TokenType::Semi) {
-            self.consume(TokenType::Number, "Expected scalar literal as length in vector");
+            self.consume(
+                TokenType::Number,
+                "Expected scalar literal as length in vector",
+            );
 
             let length = self.number();
 
@@ -327,7 +357,10 @@ impl<'a> Parser<'a> {
                 "vector literals must end with ']' and be up to 4 components",
             );
 
-            return Ast::new(AstNode::VecRepeated(Box::new(first), Box::new(length)), self.previous().line);
+            return Ast::new(
+                AstNode::VecRepeated(Box::new(first), Box::new(length)),
+                self.previous().line,
+            );
         }
 
         self.consume(TokenType::Comma, "Expected ',' in vector arguments");
@@ -352,15 +385,24 @@ impl<'a> Parser<'a> {
             "vector literals must end with ']' and be up to 4 components",
         );
 
-        Ast::new(AstNode::VecLiteral(Box::new(first), Box::new(second), third, fourth), self.previous().line)
+        Ast::new(
+            AstNode::VecLiteral(Box::new(first), Box::new(second), third, fourth),
+            self.previous().line,
+        )
     }
 
     fn number(&mut self) -> Ast {
-        Ast::new(AstNode::V(Val::Float(self.previous().lexeme.parse::<f32>().unwrap())), self.previous().line)
+        Ast::new(
+            AstNode::V(Val::Float(self.previous().lexeme.parse::<f32>().unwrap())),
+            self.previous().line,
+        )
     }
 
     fn identity(&mut self) -> Ast {
-        Ast::new(AstNode::Ident(self.rodeo.get_or_intern(self.previous().lexeme)), self.previous().line)
+        Ast::new(
+            AstNode::Ident(self.rodeo.get_or_intern(self.previous().lexeme)),
+            self.previous().line,
+        )
     }
 
     fn call(&mut self) -> Ast {
@@ -370,7 +412,11 @@ impl<'a> Parser<'a> {
         let builtin = if let Some(&builtin) = self.builtins.get(name) {
             builtin
         } else {
-            report(ErrorType::Parse, token.line, format!("Built-in function '{}' does not exist", name).as_str())
+            report(
+                ErrorType::Parse,
+                token.line,
+                format!("Built-in function '{}' does not exist", name).as_str(),
+            )
         };
 
         self.consume(

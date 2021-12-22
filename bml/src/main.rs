@@ -47,7 +47,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             process::exit(0);
         } else {
             println!("Invalid flag '{}' (expected '--eval')", flag);
-            
+
             process::exit(1);
         }
     }

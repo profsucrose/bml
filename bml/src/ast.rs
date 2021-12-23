@@ -1,5 +1,5 @@
 use lasso::{Rodeo, Spur};
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Rem};
 
 use crate::logger::{report, ErrorType};
 
@@ -215,7 +215,7 @@ impl Val {
         self.map(f32::fract)
     }
 
-    pub fn pow(&self, exp: Val) -> Result<Val, String> {
+    pub fn pow(&self, exp: Self) -> Result<Val, String> {
         match (self, exp) {
             (Float(_), Float(_))
                 | (Vec2(_, _), Vec2(_, _))
@@ -257,24 +257,24 @@ impl Val {
         }
     }
 
-    pub fn min(&self, val: &Val) -> Result<Val, String> {
+    pub fn min(&self, val: Self) -> Result<Val, String> {
         match (self, val) {
             (Float(_), Float(_))
                 | (Vec2(_, _), Vec2(_, _))
                 | (Vec3(_, _, _), Vec3(_, _, _))
                 | (Vec4(_, _, _, _), Vec4(_, _, _, _))
-            => Ok(self.zipmap(*val, |x, y| x.min(y))),
+            => Ok(self.zipmap(val, |x, y| x.min(y))),
             _ => Err(format!("Expected min(float, float), min(vec2, vec2), min(vec3, vec3), min(vec4, vec4), got min({:?}, {:?})", self, val))
         }
     }
 
-    pub fn max(&self, val: &Val) -> Result<Val, String> {
+    pub fn max(&self, val: Self) -> Result<Val, String> {
         match (self, val) {
             (Float(_), Float(_))
                 | (Vec2(_, _), Vec2(_, _))
                 | (Vec3(_, _, _), Vec3(_, _, _))
                 | (Vec4(_, _, _, _), Vec4(_, _, _, _))
-            => Ok(self.zipmap(*val, |x, y| x.max(y))),
+            => Ok(self.zipmap(val, |x, y| x.max(y))),
             _ => Err(format!("Expected max(float, float), max(vec2, vec2), max(vec3, vec3), max(vec4, vec4), got max({:?}, {:?})", self, val))
         }
     }
@@ -401,7 +401,6 @@ pub enum BuiltIn {
     Clamp,
     Mix,
     Step,
-    SmoothStep,
     Length,
     Dot,
     Cross,
@@ -520,6 +519,65 @@ impl EvalRet {
 
 fn need_val(v: Option<Val>) -> Val {
     v.expect("context requires associated expression to return a value")
+}
+
+macro_rules! builtin_one_arg {
+    ($op:path, $function:expr, $len:ident, $ast:ident, $vals:ident, $env:ident) => {{
+        if $len != 1 {
+            report(
+                ErrorType::Runtime,
+                $ast.line,
+                format!("Expected 1 input to {}(a), got {}", $function, $len).as_str(),
+            )
+        }
+
+        EvalRet::new($env).with_val(Some($op(&$vals.pop().unwrap())))
+    }};
+}
+
+macro_rules! builtin_two_args {
+    ($op:path, $function:expr, $len:ident, $ast:ident, $vals:ident, $env:ident) => {{
+        if $len != 2 {
+            report(
+                ErrorType::Runtime,
+                $ast.line,
+                format!("Expected 2 inputs to {}(a, b), got {}", $function, $len).as_str(),
+            )
+        }
+
+        let arg2 = $vals.pop().unwrap();
+        let arg1 = $vals.pop().unwrap();
+
+        EvalRet::new($env).with_val(Some(
+            match $op(&arg1, arg2) {
+                Ok(result) => result,
+                Err(error) => report(ErrorType::Runtime, $ast.line, error.as_str()),
+            },
+        ))
+    }};
+}
+
+macro_rules! builtin_three_args {
+    ($op:path, $function:expr, $len:ident, $ast:ident, $vals:ident, $env:ident) => {{
+        if $len != 3 {
+            report(
+                ErrorType::Runtime,
+                $ast.line,
+                format!("Expected 3 inputs to {}(a, b, c), got {}", $function, $len).as_str(),
+            )
+        }
+
+        let arg3 = $vals.pop().unwrap();
+        let arg2 = $vals.pop().unwrap();
+        let arg1 = $vals.pop().unwrap();
+
+        EvalRet::new($env).with_val(Some(
+            match $op(&arg1, arg2, arg3) {
+                Ok(result) => result,
+                Err(error) => report(ErrorType::Runtime, $ast.line, error.as_str()),
+            },
+        ))
+    }};
 }
 
 pub fn eval(ast: &Ast, e: Env, r: &Rodeo) -> EvalRet {
@@ -662,10 +720,11 @@ pub fn eval(ast: &Ast, e: Env, r: &Rodeo) -> EvalRet {
                 (Float(l), Op::Less, Float(r)) => Float((l < r) as i32 as f32),
                 (Float(l), Op::MoreEq, Float(r)) => Float((l <= r) as i32 as f32),
                 (Float(l), Op::LessEq, Float(r)) => Float((l >= r) as i32 as f32),
+                (Float(l), Op::Equal, Float(r)) => Float(if l == r { 1.0 } else { 0.0 }),
                 _ => report(
                     ErrorType::Runtime,
                     ast.line,
-                    format!("Unexpected scalar/vector binary operation relationship, got {:#?} {:#?} {:#?}", lval, op, rval).as_str(),
+                    format!("Unexpected scalar/vector binary operation relationship, got {:?} `{:?}` {:?}", lval, op, rval).as_str(),
                 )
             }))
         }
@@ -716,75 +775,92 @@ pub fn eval(ast: &Ast, e: Env, r: &Rodeo) -> EvalRet {
                 BuiltIn::Mat3 => todo!(),
                 BuiltIn::Mat4 => todo!(),
                 BuiltIn::Dist => {
-                    if len != 2 {
-                        report(
-                            ErrorType::Runtime,
-                            ast.line,
-                            format!("Expected 2 inputs to dist(a, b), got {}", len).as_str(),
-                        )
-                    }
-
-                    let distance = match vals.pop().unwrap().dist(vals.pop().unwrap()) {
-                        Ok(distance) => distance,
-                        Err(error) => report(ErrorType::Runtime, ast.line, error.as_str()),
-                    };
-
-                    EvalRet::new(env).with_val(Some(distance))
-                }
-                BuiltIn::Sin => {
-                    if len != 1 {
-                        report(
-                            ErrorType::Runtime,
-                            ast.line,
-                            format!("Expected 1 input to sin(a), got {}", len).as_str(),
-                        )
-                    }
-
-                    EvalRet::new(env).with_val(Some(vals.pop().unwrap().sin()))
+                    builtin_two_args!(Val::dist, "dist", len, ast, vals, env)
                 }
                 BuiltIn::Pow => {
-                    if len != 2 {
-                        report(
-                            ErrorType::Runtime,
-                            ast.line,
-                            format!("Expected 2 inputs to pow(a, b), got {}", len).as_str(),
-                        )
-                    }
-
-                    let pow = match vals.pop().unwrap().dist(vals.pop().unwrap()) {
-                        Ok(distance) => distance,
-                        Err(error) => report(ErrorType::Runtime, ast.line, error.as_str()),
-                    };
-
-                    EvalRet::new(env).with_val(Some(pow))
+                    builtin_two_args!(Val::pow, "pow", len, ast, vals, env)
                 }
-                BuiltIn::Cos => todo!(),
-                BuiltIn::Tan => todo!(),
-                BuiltIn::Asin => todo!(),
-                BuiltIn::Acos => todo!(),
-                BuiltIn::Atan => todo!(),
-                BuiltIn::Exp => todo!(),
-                BuiltIn::Log => todo!(),
-                BuiltIn::Sqrt => todo!(),
-                BuiltIn::InverseSqrt => todo!(),
-                BuiltIn::Abs => todo!(),
-                BuiltIn::Sign => todo!(),
-                BuiltIn::Floor => todo!(),
-                BuiltIn::Ceil => todo!(),
-                BuiltIn::Fract => todo!(),
-                BuiltIn::Mod => todo!(),
-                BuiltIn::Min => todo!(),
-                BuiltIn::Max => todo!(),
-                BuiltIn::Clamp => todo!(),
-                BuiltIn::Mix => todo!(),
-                BuiltIn::Step => todo!(),
-                BuiltIn::SmoothStep => todo!(),
-                BuiltIn::Length => todo!(),
-                BuiltIn::Dot => todo!(),
-                BuiltIn::Cross => todo!(),
-                BuiltIn::Norm => todo!(),
-                BuiltIn::Radians => todo!(),
-                BuiltIn::Degrees => todo!(),
+                BuiltIn::Sin => {
+                    builtin_one_arg!(Val::sin, "sin", len, ast, vals, env)
+                }
+                BuiltIn::Cos => {
+                    builtin_one_arg!(Val::cos, "cos", len, ast, vals, env)
+                }
+                BuiltIn::Tan => {
+                    builtin_one_arg!(Val::tan, "tan", len, ast, vals, env)
+                }
+                BuiltIn::Asin => {
+                    builtin_one_arg!(Val::asin, "asin", len, ast, vals, env)
+                }
+                BuiltIn::Acos => {
+                    builtin_one_arg!(Val::acos, "acos", len, ast, vals, env)
+                }
+                BuiltIn::Atan => {
+                    builtin_one_arg!(Val::atan, "atan", len, ast, vals, env)
+                }
+                BuiltIn::Exp => {
+                    builtin_one_arg!(Val::exp, "exp", len, ast, vals, env)
+                }
+                BuiltIn::Log => {
+                    builtin_one_arg!(Val::log, "log", len, ast, vals, env)
+                }
+                BuiltIn::Sqrt => {
+                    builtin_one_arg!(Val::sqrt, "sqrt", len, ast, vals, env)
+                }
+                BuiltIn::InverseSqrt => {
+                    builtin_one_arg!(Val::invsqrt, "invsqrt", len, ast, vals, env)
+                }
+                BuiltIn::Abs => {
+                    builtin_one_arg!(Val::abs, "abs", len, ast, vals, env)
+                }
+                BuiltIn::Sign => {
+                    builtin_one_arg!(Val::sign, "sign", len, ast, vals, env)
+                }
+                BuiltIn::Floor => {
+                    builtin_one_arg!(Val::floor, "floor", len, ast, vals, env)
+                }
+                BuiltIn::Ceil => {
+                    builtin_one_arg!(Val::ceil, "ceil", len, ast, vals, env)
+                }
+                BuiltIn::Fract => {
+                    builtin_one_arg!(Val::fract, "fract", len, ast, vals, env)
+                }
+                BuiltIn::Mod => {
+                    builtin_two_args!(Val::modulo, "mod", len, ast, vals, env)
+                }
+                BuiltIn::Min => {
+                    builtin_two_args!(Val::min, "min", len, ast, vals, env)
+                }
+                BuiltIn::Max => {
+                    builtin_two_args!(Val::max, "max", len, ast, vals, env)
+                }
+                BuiltIn::Clamp => {
+                    builtin_three_args!(Val::clamp, "clamp", len, ast, vals, env)
+                }
+                BuiltIn::Mix => {
+                    builtin_three_args!(Val::mix, "mix", len, ast, vals, env)
+                }
+                BuiltIn::Step => {
+                    builtin_two_args!(Val::step, "step", len, ast, vals, env)
+                }
+                BuiltIn::Length => {
+                    builtin_one_arg!(Val::length, "length", len, ast, vals, env)
+                }
+                BuiltIn::Dot => {
+                    builtin_two_args!(Val::dot, "dot", len, ast, vals, env)
+                }
+                BuiltIn::Cross => {
+                    builtin_two_args!(Val::cross, "cross", len, ast, vals, env)
+                }
+                BuiltIn::Norm => {
+                    builtin_one_arg!(Val::norm, "norm", len, ast, vals, env)
+                }
+                BuiltIn::Radians => {
+                    builtin_one_arg!(Val::radians, "radians", len, ast, vals, env)
+                }
+                BuiltIn::Degrees => {
+                    builtin_one_arg!(Val::degrees, "degrees", len, ast, vals, env)
+                }
             }
         }
     }

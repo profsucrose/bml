@@ -39,10 +39,35 @@ impl<'a> Parser<'a> {
     pub fn from(tokens: &Vec<Token>) -> Parser {
         let mut builtins = HashMap::new();
 
-        builtins.insert(String::from("dist"), BuiltIn::Dist);
+        builtins.insert(String::from("dist"), BuiltIn::Dist); 
         builtins.insert(String::from("radians"), BuiltIn::Radians);
-        builtins.insert(String::from("pow"), BuiltIn::Pow);
+        builtins.insert(String::from("degrees"), BuiltIn::Degrees);
         builtins.insert(String::from("sin"), BuiltIn::Sin);
+        builtins.insert(String::from("cos"), BuiltIn::Cos);
+        builtins.insert(String::from("tan"), BuiltIn::Tan);
+        builtins.insert(String::from("asin"), BuiltIn::Asin);
+        builtins.insert(String::from("acos"), BuiltIn::Acos);
+        builtins.insert(String::from("atan"), BuiltIn::Atan);
+        builtins.insert(String::from("pow"), BuiltIn::Pow);
+        builtins.insert(String::from("exp"), BuiltIn::Exp);
+        builtins.insert(String::from("log"), BuiltIn::Log);
+        builtins.insert(String::from("sqrt"), BuiltIn::Sqrt);
+        builtins.insert(String::from("invsqrt"), BuiltIn::InverseSqrt);
+        builtins.insert(String::from("abs"), BuiltIn::Abs);
+        builtins.insert(String::from("sign"), BuiltIn::Sign);
+        builtins.insert(String::from("floor"), BuiltIn::Floor);
+        builtins.insert(String::from("ceil"), BuiltIn::Ceil);
+        builtins.insert(String::from("fract"), BuiltIn::Fract);
+        builtins.insert(String::from("mod"), BuiltIn::Mod);
+        builtins.insert(String::from("min"), BuiltIn::Min);
+        builtins.insert(String::from("max"), BuiltIn::Max);
+        builtins.insert(String::from("clamp"), BuiltIn::Clamp);
+        builtins.insert(String::from("mix"), BuiltIn::Mix);
+        builtins.insert(String::from("step"), BuiltIn::Step);
+        builtins.insert(String::from("length"), BuiltIn::Length);
+        builtins.insert(String::from("dot"), BuiltIn::Dot);
+        builtins.insert(String::from("cross"), BuiltIn::Cross);
+        builtins.insert(String::from("norm"), BuiltIn::Norm);
 
         Parser {
             tokens,

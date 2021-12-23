@@ -1,5 +1,6 @@
 use lasso::{Rodeo, Spur};
-use std::{collections::HashMap, ops::Rem};
+use core::panic;
+use std::{collections::HashMap};
 
 use crate::logger::{report, ErrorType};
 
@@ -25,7 +26,7 @@ pub enum Field {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub struct Swizzle(
+pub struct Swizzle (
     pub Field,
     pub Option<Field>,
     pub Option<Field>,
@@ -38,6 +39,9 @@ pub enum Val {
     Vec2(f32, f32),
     Vec3(f32, f32, f32),
     Vec4(f32, f32, f32, f32),
+    Mat2([f32; 2], [f32; 2]),
+    Mat3([f32; 3], [f32; 3], [f32; 3]),
+    Mat4([f32; 4], [f32; 4], [f32; 4], [f32; 4])
 }
 
 use Val::*;
@@ -94,6 +98,9 @@ impl Val {
             Vec2(x, y) => Vec2(f(x), f(y)),
             Vec3(x, y, z) => Vec3(f(x), f(y), f(z)),
             Vec4(x, y, z, w) => Vec4(f(x), f(y), f(z), f(w)),
+            Mat2(row0, row1) => Mat2(row0.map(|x| f(x)), row1.map(|x| f(x))),
+            Mat3(row0, row1, row2) => Mat3(row0.map(|x| f(x)), row1.map(|x| f(x)), row2.map(|x| f(x))),
+            Mat4(row0, row1, row2, row3) => Mat4(row0.map(|x| f(x)), row1.map(|x| f(x)), row2.map(|x| f(x)), row3.map(|x| f(x)))
         }
     }
 
@@ -141,25 +148,50 @@ impl Val {
                 Vec2(x, _) => x,
                 Vec3(x, _, _) => x,
                 Vec4(x, _, _, _) => x,
+                _ => panic!("Tried to swizzle matrix")
             },
             Field::Y => match *self {
                 Float(_) => panic!("Float has no y field"),
                 Vec2(_, y) => y,
                 Vec3(_, y, _) => y,
                 Vec4(_, y, _, _) => y,
+                _ => panic!("Tried to swizzle matrix")
             },
             Field::Z => match *self {
                 Float(_) => panic!("Float has no z field"),
                 Vec2(_, _) => panic!("Vec2 has no z field"),
                 Vec3(_, _, z) => z,
                 Vec4(_, _, z, _) => z,
+                _ => panic!("Tried to swizzle matrix")
             },
             Field::W => match *self {
                 Float(_) => panic!("Float has no w field"),
                 Vec2(_, _) => panic!("Vec2 has no w field"),
                 Vec3(_, _, _) => panic!("Vec3 has no w field"),
                 Vec4(_, _, _, w) => w,
+                _ => panic!("Tried to swizzle matrix")
             },
+        }
+    }
+
+    pub fn index_matrix(&self, f: usize) -> Result<Val, String> { 
+        match (self, f) {
+            (&Mat2(row0, _), 0) => Ok(Vec2(row0[0], row0[1])),
+            (&Mat2(_, row1), 1) => Ok(Vec2(row1[0], row1[1])),
+            (&Mat2(_, _), index) => Err(format!("Expected 0 <= index <= 1 when accessing mat2, got {}", index)),
+
+            (&Mat3(row0, _, _), 0) => Ok(Vec3(row0[0], row0[1], row0[2])),
+            (&Mat3(_, row1, _), 1) => Ok(Vec3(row1[0], row1[1], row1[2])),
+            (&Mat3(_, _, row2), 2) => Ok(Vec3(row2[0], row2[1], row2[2])),
+            (&Mat3(_, _, _), index) => Err(format!("Expected 0 <= index <= 2, when accessing mat3, got {}", index)),
+
+            (&Mat4(row0, _, _, _), 0) => Ok(Vec4(row0[0], row0[1], row0[2], row0[3])),
+            (&Mat4(_, row1, _, _), 1) => Ok(Vec4(row1[0], row1[1], row1[2], row1[3])),
+            (&Mat4(_, _, row2, _), 2) => Ok(Vec4(row2[0], row2[1], row2[2], row2[3])),
+            (&Mat4(_, _, _, row3), 3) => Ok(Vec4(row3[0], row3[1], row3[2], row3[3])),
+            (&Mat4(_, _, _, _), index) => Err(format!("Expected 0 <= index <= 3, when accessing mat4, got {}", index)),
+
+            (accessor, _) => Err(format!("Expected matrix when indexing, got {:?}", accessor))
         }
     }
 
@@ -336,6 +368,8 @@ impl Val {
             Vec2(x, y) => x + y,
             Vec3(x, y, z) => x + y + z,
             Vec4(x, y, z, w) => x + y + z + w,
+
+            _ => panic!("Tried to get length of matrix")
         };
 
         Float(sum.sqrt())
@@ -412,6 +446,7 @@ pub enum AstNode {
     V(Val),
     Assign(Spur, Box<Ast>),
     Block(Vec<Ast>),
+    MatAccess(Box<Ast>, Box<Ast>),
     VecLiteral(Box<Ast>, Box<Ast>, Option<Box<Ast>>, Option<Box<Ast>>),
     VecRepeated(Box<Ast>, Box<Ast>),
     VecAccess(Box<Ast>, Swizzle),
@@ -653,6 +688,32 @@ pub fn eval(ast: &Ast, e: Env, r: &Rodeo) -> EvalRet {
                 _ => panic!(),
             }
         }
+        MatAccess(mat, row) => {
+            let ERVal { env, val: matrix } = eval(&mat, e, r).needs_val();
+            let ERVal { env, val: access } = eval(&row, env, r).needs_val();
+
+            let access = if let Float(access) = access {
+                access
+            } else {
+                report(
+                    ErrorType::Runtime,
+                    ast.line,
+                    format!("Expected float when indexing matrix, got {:?}", access).as_str()
+                )
+            };
+
+            let row = match matrix {
+                Mat2(_, _) => matrix.index_matrix(access as usize),
+                Mat3(_, _, _) => matrix.index_matrix(access as usize),
+                Mat4(_, _, _, _) => matrix.index_matrix(access as usize),
+                _ => report(ErrorType::Runtime, ast.line, format!("Expected matrix when indexing, got {:?}", matrix).as_str())
+            };
+
+            match row {
+                Ok(row) => return EvalRet::new(env).with_val(Some(row)),
+                Err(error) => report(ErrorType::Runtime, ast.line, error.as_str())
+            }
+        }
         VecAccess(access_me, swiz) => {
             let ERVal { env, val } = eval(&access_me, e, r).needs_val();
 
@@ -759,21 +820,54 @@ pub fn eval(ast: &Ast, e: Env, r: &Rodeo) -> EvalRet {
                     });
 
             match *builtin {
-                BuiltIn::Mat2 => todo!(),
-                // BuiltIn::Mat2 => {
-                //     if len != 2 {
-                //         report(ErrorType::Runtime, ast.line, format!("Expected 2 inputs to mat2(vec2, vec2), got {}", len).as_str());
-                //     }
+                BuiltIn::Mat2 => {
+                    if len != 2 {
+                        report(ErrorType::Runtime, ast.line, format!("Expected 2 inputs to mat2(vec2, vec2), got {}", len).as_str());
+                    }
 
-                //     let mat = match (vals.pop(), vals.pop()) {
-                //         (Vec2(x0, y0), Vec2(x1, y1)) => Mat2(Vec2(x0, y0), Vec2(x1, y1)),
-                //         (x, y) => report(ErrorType::Runtime, ast.line, format!("Expected mat2(vec2, vec2), got mat2({:?}, {:?})", x, y).as_str())
-                //     };
+                    let arg2 = vals.pop().unwrap();
+                    let arg1 = vals.pop().unwrap();
 
-                //     EvalRet::new(env).with_val(Some(mat))
-                // },
-                BuiltIn::Mat3 => todo!(),
-                BuiltIn::Mat4 => todo!(),
+                    let mat = match (arg1, arg2) {
+                        (Vec2(x0, y0), Vec2(x1, y1)) => Mat2([x0, y0], [x1, y1]),
+                        (x, y) => report(ErrorType::Runtime, ast.line, format!("Expected mat2(vec2, vec2), got mat2({:?}, {:?})", x, y).as_str())
+                    };
+
+                    EvalRet::new(env).with_val(Some(mat))
+                },
+                BuiltIn::Mat3 => {
+                    if len != 3 {
+                        report(ErrorType::Runtime, ast.line, format!("Expected 3 inputs to mat3(vec3, vec3, vec3), got {}", len).as_str());
+                    }
+
+                    let arg3 = vals.pop().unwrap();
+                    let arg2 = vals.pop().unwrap();
+                    let arg1 = vals.pop().unwrap();
+
+                    let mat = match (arg1, arg2, arg3) {
+                        (Vec3(x0, y0, z0), Vec3(x1, y1, z1), Vec3(x2, y2, z2)) => Mat3([x0, y0, z0], [x1, y1, z1], [x2, y2, z2]),
+                        (x, y, z) => report(ErrorType::Runtime, ast.line, format!("Expected mat3(vec3, vec3, vec3), got mat3({:?}, {:?}, {:?})", x, y, z).as_str())
+                    };
+
+                    EvalRet::new(env).with_val(Some(mat))
+                },
+                BuiltIn::Mat4 => {
+                    if len != 4 {
+                        report(ErrorType::Runtime, ast.line, format!("Expected 4 inputs to mat4(vec4, vec4, vec4, vec4), got {}", len).as_str());
+                    }
+
+                    let arg4 = vals.pop().unwrap();
+                    let arg3 = vals.pop().unwrap();
+                    let arg2 = vals.pop().unwrap();
+                    let arg1 = vals.pop().unwrap();
+
+                    let mat = match (arg1, arg2, arg3, arg4) {
+                        (Vec4(x0, y0, z0, w0), Vec4(x1, y1, z1, w1), Vec4(x2, y2, z2, w2), Vec4(x3, y3, z3, w3)) => Mat4([x0, y0, z0, w0], [x1, y1, z1, w1], [x2, y2, z2, w2], [x3, y3, z3, w3]),
+                        (x, y, z, w) => report(ErrorType::Runtime, ast.line, format!("Expected mat4(vec4, vec4, vec4, vec4), got mat4({:?}, {:?}, {:?}, {:?})", x, y, z, w).as_str())
+                    };
+
+                    EvalRet::new(env).with_val(Some(mat))
+                },
                 BuiltIn::Dist => {
                     builtin_two_args!(Val::dist, "dist", len, ast, vals, env)
                 }

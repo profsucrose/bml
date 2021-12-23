@@ -5,14 +5,14 @@ use bml::ast::{self, eval};
 use image::io::Reader as ImageReader;
 
 macro_rules! gen_runtime_idents {
-  ($($x:ident $(,)? )*) => {
-    struct RuntimeIdents { $($x: lasso::Spur,)* }
-    impl RuntimeIdents {
-      fn new(rodeo: &mut lasso::Rodeo<lasso::Spur>) -> Self {
-        Self { $($x: rodeo.get_or_intern(stringify!($x)), )* }
-      }
-    }
-  }
+    ($($x:ident $(,)? )*) => {
+        struct RuntimeIdents { $($x: lasso::Spur,)* }
+            impl RuntimeIdents {
+                fn new(rodeo: &mut lasso::Rodeo<lasso::Spur>) -> Self {
+                    Self { $($x: rodeo.get_or_intern(stringify!($x)), )* }
+                }
+            }
+        }
 }
 
 gen_runtime_idents!(resolution, coord, frag, frame, frame_count);
@@ -32,6 +32,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let file = std::fs::read_to_string(&script_name)?;
         let raw = bml::Scanner::from(file).scan();
         let expanded = bml::PreProcessor::from(raw).process();
+        println!(
+            "{}",
+            expanded
+                .iter()
+                .map(|x| x.lexeme.to_owned())
+                .collect::<String>()
+        );
         bml::Parser::from(&expanded).parse()
     };
 

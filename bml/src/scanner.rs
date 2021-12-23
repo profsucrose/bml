@@ -18,7 +18,6 @@ impl Scanner {
 
         keywords.insert("if", TokenType::If);
         keywords.insert("else", TokenType::Else);
-        keywords.insert("repeat", TokenType::Repeat);
         keywords.insert("return", TokenType::Return);
         keywords.insert("give", TokenType::Give);
         keywords.insert("macro", TokenType::Macro);
@@ -105,7 +104,7 @@ impl Scanner {
             }
             '#' => {
                 // single line comment, skip line
-                while !self.at_end() && self.peek() != '\n' {
+                while !self.at_end() && self.peek().unwrap() != '\n' {
                     self.advance();
                 }
             }
@@ -130,8 +129,8 @@ impl Scanner {
         self.add_token(TokenType::Dot);
 
         loop {
-            if !self.at_end() {
-                if let Some(&swazzler) = self.swizzles.get(&self.peek()) {
+            if let Some(next) = self.peek() {
+                if let Some(&swazzler) = self.swizzles.get(&next) {
                     self.start = self.current;
 
                     self.advance();
@@ -147,7 +146,7 @@ impl Scanner {
 
     fn identifier(&mut self) {
         loop {
-            if self.at_end() || (!self.peek().is_alphanumeric() && self.peek() != '_') {
+            if self.at_end() || (!self.peek().unwrap().is_alphanumeric() && self.peek().unwrap() != '_') {
                 break;
             }
 
@@ -165,10 +164,17 @@ impl Scanner {
     fn number(&mut self) {
         self.consume_digits();
 
-        if !self.at_end() && self.peek() == '.' && self.peek_next().is_digit(10) {
-            self.advance();
+        match (self.peek(), self.peek_next()) {
+            (Some('.'), Some(next)) => {
+                println!("Check passed");
 
-            self.consume_digits();
+                if next.is_digit(10) {
+                    self.advance();
+
+                    self.consume_digits();
+                }
+            },
+            _ => {}
         }
 
         self.add_token(TokenType::Number)
@@ -176,20 +182,28 @@ impl Scanner {
 
     fn consume_digits(&mut self) {
         loop {
-            if !self.peek().is_digit(10) {
-                break;
+            if self.at_end() || !self.peek().unwrap().is_digit(10) {
+                break
             }
 
             self.advance();
         }
     }
 
-    fn peek_next(&self) -> char {
-        self.char_at(self.current + 1)
+    fn peek_next(&self) -> Option<char> {
+        if self.current + 1 >= self.source.len() { 
+            None
+        } else {
+            Some(self.char_at(self.current + 1))
+        }
     }
 
-    fn peek(&self) -> char {
-        self.char_at(self.current)
+    fn peek(&self) -> Option<char> {
+        if self.at_end() {
+            None
+        } else {
+            Some(self.char_at(self.current))
+        }
     }
 
     fn match_lexeme(&mut self, expected: char) -> bool {

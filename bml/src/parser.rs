@@ -68,6 +68,9 @@ impl<'a> Parser<'a> {
         builtins.insert(String::from("dot"), BuiltIn::Dot);
         builtins.insert(String::from("cross"), BuiltIn::Cross);
         builtins.insert(String::from("norm"), BuiltIn::Norm);
+        builtins.insert(String::from("mat2"), BuiltIn::Mat2);
+        builtins.insert(String::from("mat3"), BuiltIn::Mat3);
+        builtins.insert(String::from("mat4"), BuiltIn::Mat4);
 
         Parser {
             tokens,
@@ -176,7 +179,7 @@ impl<'a> Parser<'a> {
     }
 
     fn access(&mut self) -> Ast {
-        let mut access = self.primary();
+        let mut access = self.index();
 
         if self.match_token(TokenType::Dot) {
             let mut accessors = Vec::new();
@@ -219,6 +222,26 @@ impl<'a> Parser<'a> {
         }
 
         access
+    }
+
+    fn index(&mut self) -> Ast {
+        let mut value = self.primary();
+
+        if self.match_token(TokenType::LeftSquare) {
+            let index = self.expression();
+
+            self.consume(TokenType::RightSquare, "Expected ']' when indexing matrix");
+
+            value = Ast::new(
+                AstNode::MatAccess(
+                    Box::new(value),
+                    Box::new(index)
+                ),
+                self.previous().line
+            );
+        }
+
+        value
     }
 
     fn comparison(&mut self) -> Ast {

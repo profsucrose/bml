@@ -1,12 +1,27 @@
 # rainbow circle that dynamically grows
 # and shrinks depending on the frame
 
+
+
+# built-ins
+x = sin(frame)
+y = cos(frame)
+
+# user-defined macros
+macro add_one(x) x + 1
+macro add_one(x) {
+    give x + add_one(x)
+}
+
+x = 10
+y = add_one(x)
+
 uv = coord / resolution
 distance = dist(uv, [0.5, 0.5])
-radius = (sin(frame * 2) + 2) / 2 * 0.2 + 1
+radius = (sin(frame / 2) + 2) / 2 * 0.2 + 0.1
 
 return {
-    [sin(frame), cos(frame), 1, 1]
+    give [sin(frame / 10.0), cos(frame / 10.0), 1, 1]
 } if distance < radius else {
-    [0; 4]
+    give [0, 0, 0, 1]
 }

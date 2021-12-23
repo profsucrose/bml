@@ -1,13 +1,13 @@
-# 4 instructions
+# testing file
 
-macro dot(a, b) a.x * b.x + a.y * b.y
+macro adder(x, y) x + y
 
-# in buf, x, y
-x = 10
-x = x + 10
-
-repeat 2.0 + 3 {
-    x = x + 10    
+macro add_one(x) {
+    give adder(x, 1)
 }
 
-return vec4[1.0, 0.0, 1.0, 0.0]
+x = add_one(10)
+
+y = x + add_one(10)
+
+return x

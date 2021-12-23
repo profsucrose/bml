@@ -1,4 +1,10 @@
-# todo 4 manaña
+# TODO
+
+* Matrices
+* Fix nested blocks in macros
+* Sc integration w/ bot
+* Gif generation w/ bot
+
 
 ## BML
     * DONE: finish preprocessor (nested macros)

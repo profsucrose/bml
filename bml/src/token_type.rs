@@ -33,7 +33,6 @@ pub enum TokenType {
     // keywords
     If,
     Else,
-    Repeat,
     Return,
     Give,
     Macro,

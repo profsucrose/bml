@@ -4,6 +4,7 @@
 * Fix nested blocks in macros
 * Sc integration w/ bot
 * Gif generation w/ bot
+* add flags for blank image generation
 
 
 ## BML

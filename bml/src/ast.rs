@@ -361,51 +361,67 @@ impl Val {
     pub fn radians(&self) -> Val {
         self.map(math::rad)
     }
+
     pub fn degrees(&self) -> Val {
         self.map(math::deg)
     }
+
     pub fn sin(&self) -> Val {
         self.map(f32::sin)
     }
+
     pub fn cos(&self) -> Val {
         self.map(f32::cos)
     }
+
     pub fn tan(&self) -> Val {
         self.map(f32::tan)
     }
+
     pub fn asin(&self) -> Val {
         self.map(f32::asin)
     }
+
     pub fn acos(&self) -> Val {
         self.map(f32::acos)
     }
+
     pub fn atan(&self) -> Val {
         self.map(f32::atan)
     }
+
     pub fn exp(&self) -> Val {
         self.map(f32::exp)
     }
+
     pub fn log(&self) -> Val {
         self.map(|x| f32::log(std::f32::consts::E, x))
     }
+
     pub fn sqrt(&self) -> Val {
         self.map(f32::sqrt)
     }
+
     pub fn invsqrt(&self) -> Val {
         self.map(math::inv_sqrt)
     }
+
     pub fn abs(&self) -> Val {
         self.map(f32::abs)
     }
+
     pub fn sign(&self) -> Val {
         self.map(f32::signum)
     }
+
     pub fn floor(&self) -> Val {
         self.map(f32::floor)
     }
+
     pub fn ceil(&self) -> Val {
         self.map(f32::ceil)
     }
+
     pub fn fract(&self) -> Val {
         self.map(f32::fract)
     }
@@ -619,6 +635,7 @@ pub enum BuiltIn {
 #[derive(Debug, Clone)]
 pub enum AstNode {
     V(Val),
+    Repeat(f32, Box<Ast>),
     Assign(Spur, Box<Ast>),
     Block(Vec<Ast>),
     MatAccess(Box<Ast>, Box<Ast>),
@@ -790,6 +807,25 @@ pub fn eval(ast: &Ast, e: Env, r: &Rodeo) -> EvalRet {
     use AstNode::*;
 
     match &ast.node {
+        Repeat(times, block) => {
+            if *times < 1.0 - f32::EPSILON {
+                report(ErrorType::Runtime, ast.line, format!("Expected positive compile-time literal in repeat statement, got {}", times).as_str());
+            }
+
+            let t = *times as usize;
+
+            if (times - (t as f32)).abs() > f32::EPSILON {
+                report(ErrorType::Runtime, ast.line, format!("Expected whole number in repeat statement, got {}", times).as_str());
+            }
+
+            let mut ret = eval(block, e, &r);
+
+            for _ in 0..t - 1 {
+                ret = eval(block, ret.env, &r);
+            }
+
+            ret
+        }
         &V(v) => EvalRet::new(e).with_val(Some(v)),
         Assign(i, to) => {
             let ERVal { mut env, val } = eval(&to, e, r).needs_val();

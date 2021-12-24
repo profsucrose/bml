@@ -46,48 +46,46 @@ macro_rules! builtins {
 impl<'a> Parser<'a> {
     pub fn from(tokens: &Vec<Token>) -> Parser {
         let builtins = builtins!(
-            ("dist",        BuiltIn::Dist), 
-            ("radians",     BuiltIn::Radians),
-            ("degrees",     BuiltIn::Degrees),
-            ("sin",         BuiltIn::Sin),
-            ("cos",         BuiltIn::Cos),
-            ("tan",         BuiltIn::Tan),
-            ("asin",        BuiltIn::Asin),
-            ("acos",        BuiltIn::Acos),
-            ("atan",        BuiltIn::Atan),
-            ("pow",         BuiltIn::Pow),
-            ("exp",         BuiltIn::Exp),
-            ("log",         BuiltIn::Log),
-            ("sqrt",        BuiltIn::Sqrt),
-            ("invsqrt",     BuiltIn::InverseSqrt),
-            ("abs",         BuiltIn::Abs),
-            ("sign",        BuiltIn::Sign),
-            ("floor",       BuiltIn::Floor),
-            ("ceil",        BuiltIn::Ceil),
-            ("fract",       BuiltIn::Fract),
-            ("mod",         BuiltIn::Mod),
-            ("min",         BuiltIn::Min),
-            ("max",         BuiltIn::Max),
-            ("clamp",       BuiltIn::Clamp),
-            ("mix",         BuiltIn::Mix),
-            ("step",        BuiltIn::Step),
-            ("length",      BuiltIn::Length),
-            ("dot",         BuiltIn::Dot),
-            ("cross",       BuiltIn::Cross),
-            ("norm",        BuiltIn::Norm),
-
-            ("mat2",        BuiltIn::Mat2),
-            ("mat3",        BuiltIn::Mat3),
-            ("mat4",        BuiltIn::Mat4),
-
-            ("rotate_x",    BuiltIn::RotateX),
-            ("rotate_y",    BuiltIn::RotateY),
-            ("rotate_z",    BuiltIn::RotateZ),
-            ("rotate",      BuiltIn::Rotate),
-            ("scale",       BuiltIn::Scale),
-            ("translate",   BuiltIn::Translate),
-            ("ortho",       BuiltIn::Ortho),
-            ("lookat",      BuiltIn::LookAt),
+            ("dist", BuiltIn::Dist),
+            ("radians", BuiltIn::Radians),
+            ("degrees", BuiltIn::Degrees),
+            ("sin", BuiltIn::Sin),
+            ("cos", BuiltIn::Cos),
+            ("tan", BuiltIn::Tan),
+            ("asin", BuiltIn::Asin),
+            ("acos", BuiltIn::Acos),
+            ("atan", BuiltIn::Atan),
+            ("pow", BuiltIn::Pow),
+            ("exp", BuiltIn::Exp),
+            ("log", BuiltIn::Log),
+            ("sqrt", BuiltIn::Sqrt),
+            ("invsqrt", BuiltIn::InverseSqrt),
+            ("abs", BuiltIn::Abs),
+            ("sign", BuiltIn::Sign),
+            ("floor", BuiltIn::Floor),
+            ("ceil", BuiltIn::Ceil),
+            ("fract", BuiltIn::Fract),
+            ("mod", BuiltIn::Mod),
+            ("min", BuiltIn::Min),
+            ("max", BuiltIn::Max),
+            ("clamp", BuiltIn::Clamp),
+            ("mix", BuiltIn::Mix),
+            ("step", BuiltIn::Step),
+            ("length", BuiltIn::Length),
+            ("dot", BuiltIn::Dot),
+            ("cross", BuiltIn::Cross),
+            ("norm", BuiltIn::Norm),
+            ("mat2", BuiltIn::Mat2),
+            ("mat3", BuiltIn::Mat3),
+            ("mat4", BuiltIn::Mat4),
+            ("rotate_x", BuiltIn::RotateX),
+            ("rotate_y", BuiltIn::RotateY),
+            ("rotate_z", BuiltIn::RotateZ),
+            ("rotate", BuiltIn::Rotate),
+            ("scale", BuiltIn::Scale),
+            ("translate", BuiltIn::Translate),
+            ("ortho", BuiltIn::Ortho),
+            ("lookat", BuiltIn::LookAt),
             ("perspective", BuiltIn::Perspective)
         );
 
@@ -116,11 +114,35 @@ impl<'a> Parser<'a> {
         if self.match_token(TokenType::Identifier) {
             return self.assign();
         }
+
         if self.match_token(TokenType::Return) {
             return self.r#return();
         }
 
+        if self.match_token(TokenType::Repeat) {
+            return self.repeat();
+        }
+
         self.r#if()
+    }
+
+    fn repeat(&mut self) -> Ast {
+        if !self.match_token(TokenType::Number) {
+            report(ErrorType::Parse, self.peek().line, format!("Expected positive number literal in repeat statement, got '{}'", self.peek().lexeme).as_str());
+        }
+
+        let times = match self.previous().lexeme.parse::<f32>() {
+            Ok(times) => times,
+            Err(_) => report(ErrorType::Parse, self.previous().line, format!("Expected number literal in repeat statement, got '{}'", self.previous().lexeme).as_str())
+        };
+
+        if !self.match_token(TokenType::LeftBracket) {
+            report(ErrorType::Parse, self.previous().line, format!("Expected '{{' in repeat block, got '{}'", self.previous().lexeme).as_str());
+        }
+
+        let block = self.block();
+
+        Ast::new(AstNode::Repeat(times, Box::new(block)), self.previous().line)
     }
 
     fn r#if(&mut self) -> Ast {
@@ -166,10 +188,6 @@ impl<'a> Parser<'a> {
     }
 
     fn expression(&mut self) -> Ast {
-        if self.match_token(TokenType::LeftBracket) {
-            return self.block();
-        }
-
         self.equality()
     }
 
@@ -252,11 +270,8 @@ impl<'a> Parser<'a> {
             self.consume(TokenType::RightSquare, "Expected ']' when indexing matrix");
 
             value = Ast::new(
-                AstNode::MatAccess(
-                    Box::new(value),
-                    Box::new(index)
-                ),
-                self.previous().line
+                AstNode::MatAccess(Box::new(value), Box::new(index)),
+                self.previous().line,
             );
         }
 
@@ -384,6 +399,10 @@ impl<'a> Parser<'a> {
             );
         }
 
+        if self.match_token(TokenType::LeftBracket) {
+            return self.block();
+        }
+
         if self.match_token(TokenType::Identifier) {
             return self.identity();
         }
@@ -393,8 +412,16 @@ impl<'a> Parser<'a> {
 
     fn literal(&mut self) -> Ast {
         // number literal
+        if self.check(TokenType::Minus) && self.check_next(TokenType::Number) {
+            // consume - and number
+            self.advance();
+            self.advance();
+
+            return self.number(false);
+        }
+
         if self.match_token(TokenType::Number) {
-            return self.number();
+            return self.number(true);
         }
 
         if self.match_token(TokenType::LeftSquare) {
@@ -417,7 +444,7 @@ impl<'a> Parser<'a> {
                 "Expected scalar literal as length in vector",
             );
 
-            let length = self.number();
+            let length = self.number(true);
 
             self.consume(
                 TokenType::RightSquare,
@@ -458,9 +485,11 @@ impl<'a> Parser<'a> {
         )
     }
 
-    fn number(&mut self) -> Ast {
+    fn number(&mut self, positive: bool) -> Ast {
+        let sign = if positive { 1.0 } else { -1.0 };
+
         Ast::new(
-            AstNode::V(Val::Float(self.previous().lexeme.parse::<f32>().unwrap())),
+            AstNode::V(Val::Float(sign * self.previous().lexeme.parse::<f32>().unwrap())),
             self.previous().line,
         )
     }
@@ -560,6 +589,10 @@ impl<'a> Parser<'a> {
 
     fn previous(&self) -> Token {
         self.tokens[self.current - 1].clone()
+    }
+
+    fn check_next(&self, token_type: TokenType) -> bool {
+        self.current + 1 < self.tokens.len() && self.peek_next().token_type == token_type
     }
 
     fn check(&self, token_type: TokenType) -> bool {

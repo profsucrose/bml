@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "{}",
             expanded
                 .iter()
-                .map(|x| x.lexeme.to_owned())
+                .map(|x| format!("{} ", x.lexeme.to_owned()))
                 .collect::<String>()
         );
         bml::Parser::from(&expanded).parse()
@@ -86,6 +86,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .enumerate_pixels()
             .fold(env, |mut env, (x, y, rgba)| {
                 let [r, g, b, a] = rgba.0;
+
                 env.set(rti.coord, Val::Vec2(x as _, y as _));
                 env.set(
                     rti.frag,
@@ -96,7 +97,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         a as f32 / 255.0,
                     ),
                 );
+
                 let mut ret = ast::eval(&ast, env, &rodeo);
+
                 match ret.env.ret.take() {
                     Some(Val::Vec4(x, y, z, w)) => {
                         // println!("{:?}, {:?}", ret.env.get(2), ret.env.get(5));

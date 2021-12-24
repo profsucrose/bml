@@ -28,12 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         process::exit(1);
     }
 
-    let (mut rodeo, ast) = {
-        let file = std::fs::read_to_string(&script_name)?;
-        let raw = bml::Scanner::from(file).scan();
-        let expanded = bml::PreProcessor::from(raw).process();
-        bml::Parser::from(&expanded).parse()
-    };
+    let (mut rodeo, ast) = bml::string_to_ast(std::fs::read_to_string(&script_name)?);
 
     let rti = RuntimeIdents::new(&mut rodeo);
     let mut env = ast::Env::default();

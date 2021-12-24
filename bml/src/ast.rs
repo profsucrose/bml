@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use crate::logger::{report, ErrorType};
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Op {
     Add,
     Sub,
@@ -16,7 +16,7 @@ pub enum Op {
     Equal,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Field {
     X,
     Y,
@@ -24,7 +24,7 @@ pub enum Field {
     W,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Swizzle(
     pub Field,
     pub Option<Field>,
@@ -88,6 +88,13 @@ mod math {
 }
 
 impl Val {
+    pub fn float(self) -> Option<f32> {
+        match self {
+            Self::Float(x) => Some(x),
+            _ => None,
+        }
+    }
+
     pub fn map<F: FnMut(f32) -> f32>(self, mut f: F) -> Val {
         match self {
             Float(x) => Float(f(x)),
@@ -371,7 +378,7 @@ impl Val {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BuiltIn {
     Mat2,
     Mat3,
@@ -408,35 +415,77 @@ pub enum BuiltIn {
     Norm,
 }
 
-#[derive(Debug, Clone)]
-pub enum AstNode {
+#[derive(Debug, Clone, PartialEq)]
+pub enum Ast {
     V(Val),
-    Assign(Spur, Box<Ast>),
-    Block(Vec<Ast>),
-    VecLiteral(Box<Ast>, Box<Ast>, Option<Box<Ast>>, Option<Box<Ast>>),
-    VecRepeated(Box<Ast>, Box<Ast>),
-    VecAccess(Box<Ast>, Swizzle),
+    Assign(Spur, Box<SrcAst>),
+    Block(Vec<SrcAst>),
+    VecLiteral(
+        Box<SrcAst>,
+        Box<SrcAst>,
+        Option<Box<SrcAst>>,
+        Option<Box<SrcAst>>,
+    ),
+    VecRepeated(Box<SrcAst>, Box<SrcAst>),
+    VecAccess(Box<SrcAst>, Swizzle),
     Ident(Spur),
-    Return(Box<Ast>),
-    Give(Box<Ast>),
-    BinOp(Box<Ast>, Op, Box<Ast>),
+    Return(Box<SrcAst>),
+    Give(Box<SrcAst>),
+    BinOp(Box<SrcAst>, Op, Box<SrcAst>),
     If {
-        cond: Box<Ast>,
-        true_ret: Box<Ast>,
-        false_ret: Box<Ast>,
+        cond: Box<SrcAst>,
+        true_ret: Box<SrcAst>,
+        false_ret: Box<SrcAst>,
     },
-    Call(BuiltIn, Vec<Ast>),
+    Call(BuiltIn, Vec<SrcAst>),
 }
 
-#[derive(Debug, Clone)]
-pub struct Ast {
-    pub node: AstNode,
+#[derive(Debug, Clone, PartialEq)]
+pub struct SrcAst {
+    pub ast: Ast,
     pub line: usize,
 }
+impl SrcAst {
+    //! had to resist an overwhelming urge to name this "mapro"
+    pub fn map<F: Fn(SrcAst) -> SrcAst>(self, f: &F) -> Self {
+        use Ast::*;
+        let map = |sa: SrcAst| sa.map(f);
+        let bmap = |sa: Box<SrcAst>| Box::new(sa.map(f));
 
-impl Ast {
-    pub fn new(node: AstNode, line: usize) -> Ast {
-        Ast { node, line }
+        let SrcAst { ast, line } = f(self);
+        SrcAst {
+            line,
+            ast: match ast {
+                V(v) => V(v),
+                Assign(s, t) => Assign(s, bmap(t)),
+                Block(nodes) => Block(nodes.into_iter().map(map).collect()),
+                VecLiteral(x, y, z, w) => {
+                    VecLiteral(bmap(x), bmap(y), z.map(|z| bmap(z)), w.map(|w| bmap(w)))
+                }
+                VecRepeated(l, n) => VecRepeated(bmap(l), bmap(n)),
+                VecAccess(v, s) => VecAccess(bmap(v), s),
+                Ident(s) => Ident(s),
+                Return(expr) => Return(bmap(expr)),
+                Give(expr) => Give(bmap(expr)),
+                BinOp(lhs, op, rhs) => BinOp(bmap(lhs), op, bmap(rhs)),
+                If {
+                    cond,
+                    true_ret: t,
+                    false_ret: f,
+                } => If {
+                    cond: bmap(cond),
+                    true_ret: bmap(t),
+                    false_ret: bmap(f),
+                },
+                Call(bi, args) => Call(bi, args.into_iter().map(map).collect()),
+            },
+        }
+    }
+}
+
+impl SrcAst {
+    pub fn new(ast: Ast, line: usize) -> SrcAst {
+        SrcAst { ast, line }
     }
 }
 
@@ -481,13 +530,13 @@ impl Env {
 
 pub struct EvalRet {
     pub env: Env,
-    val: Option<Val>,
+    pub val: Option<Val>,
     give: Option<Val>,
 }
 
 struct ERVal {
     env: Env,
-    val: Val,
+    pub val: Val,
 }
 
 impl EvalRet {
@@ -522,10 +571,83 @@ fn need_val(v: Option<Val>) -> Val {
     v.expect("context requires associated expression to return a value")
 }
 
-pub fn eval(ast: &Ast, e: Env, r: &Rodeo) -> EvalRet {
-    use AstNode::*;
+pub fn is_const(SrcAst { ast, .. }: &SrcAst) -> bool {
+    use Ast::*;
 
-    match &ast.node {
+    match ast {
+        &V(_) => true,
+        Assign(_, _) => false,
+        Give(_) => false,
+        Block(nodes) => matches!(
+            nodes.iter().skip_while(|x| is_const(x)).next(),
+            Some(SrcAst{ ast: Give(x), .. }) if is_const(x)
+        ),
+        VecLiteral(x, y, z, w) => {
+            is_const(x)
+                && is_const(y)
+                && z.as_deref().map(is_const).unwrap_or(true)
+                && w.as_deref().map(is_const).unwrap_or(true)
+        }
+        VecRepeated(l, n) => is_const(l) && is_const(n),
+        VecAccess(v, _) => is_const(v),
+        Ident(_) => false,
+        Return(_) => false,
+        BinOp(lhs, _, rhs) => is_const(lhs) && is_const(rhs),
+        If {
+            cond,
+            true_ret: t,
+            false_ret: f,
+        } => is_const(cond) && is_const(t) && is_const(f),
+        Call(_, args) => args.into_iter().all(is_const),
+    }
+}
+
+pub fn fold(SrcAst { ast, .. }: &SrcAst) -> Option<Val> {
+    use Ast::*;
+
+    match ast {
+        &V(v) => Some(v),
+        Assign(_, _) => None,
+        Block(nodes) => nodes
+            .iter()
+            .fold(Some(None::<Val>), |a, x| match (a, &x.ast) {
+                (Some(_), Give(g)) => Some(fold(g)),
+                _ => a.filter(|_| fold(x).is_some()),
+            })
+            .flatten(),
+        VecLiteral(x, y, m_z, m_w) => Some(
+            match (
+                fold(x).and_then(|v| v.float()),
+                fold(y).and_then(|v| v.float()),
+                m_z.as_ref().map(|z| fold(z).and_then(|v| v.float())),
+                m_w.as_ref().map(|w| fold(w).and_then(|v| v.float())),
+            ) {
+                (Some(x), Some(y), Some(Some(z)), Some(Some(w))) => Val::Vec4(x, y, z, w),
+                (Some(x), Some(y), Some(Some(z)), None) => Val::Vec3(x, y, z),
+                (Some(x), Some(y), None, None) => Val::Vec2(x, y),
+                _ => return None,
+            },
+        ),
+        _ => None, /*
+                   VecRepeated(Box<SrcAst>, Box<SrcAst>),
+                   VecAccess(Box<SrcAst>, Swizzle),
+                   Ident(Spur),
+                   Return(Box<SrcAst>),
+                   Give(Box<SrcAst>),
+                   BinOp(Box<SrcAst>, Op, Box<SrcAst>),
+                   If {
+                       cond: Box<SrcAst>,
+                       true_ret: Box<SrcAst>,
+                       false_ret: Box<SrcAst>,
+                   },
+                   Call(BuiltIn, Vec<SrcAst>), */
+    }
+}
+
+pub fn eval(&SrcAst { line, ref ast }: &SrcAst, e: Env, r: &Rodeo) -> EvalRet {
+    use Ast::*;
+
+    match ast {
         &V(v) => EvalRet::new(e).with_val(Some(v)),
         Assign(i, to) => {
             let ERVal { mut env, val } = eval(&to, e, r).needs_val();
@@ -558,7 +680,7 @@ pub fn eval(ast: &Ast, e: Env, r: &Rodeo) -> EvalRet {
                 },
                 _ => report(
                     ErrorType::Runtime,
-                    ast.line,
+                    line,
                     "Both X and L in [X; L] in vector literal must evaluate to scalars",
                 ),
             }
@@ -601,7 +723,7 @@ pub fn eval(ast: &Ast, e: Env, r: &Rodeo) -> EvalRet {
             if let Val::Float(x) = val {
                 report(
                     ErrorType::Runtime,
-                    ast.line,
+                    line,
                     format!("Expected vector when swizzling, got {}", x).as_str(),
                 );
             }
@@ -618,7 +740,7 @@ pub fn eval(ast: &Ast, e: Env, r: &Rodeo) -> EvalRet {
                     val.get_field(z),
                     val.get_field(w),
                 ),
-                _ => report(ErrorType::Runtime, ast.line, "Invalid swizzle"),
+                _ => report(ErrorType::Runtime, line, "Invalid swizzle"),
             }))
         }
         &Ident(i) => {
@@ -628,7 +750,7 @@ pub fn eval(ast: &Ast, e: Env, r: &Rodeo) -> EvalRet {
 
             report(
                 ErrorType::Runtime,
-                ast.line,
+                line,
                 format!("Couldn't resolve identifier '{}'", r.resolve(&i)).as_str(),
             )
         }
@@ -652,7 +774,7 @@ pub fn eval(ast: &Ast, e: Env, r: &Rodeo) -> EvalRet {
                 | (Float(_), Op::Mul, Vec2(_, _) | Vec3(_, _, _) | Vec4(_, _, _, _))
                 | (Float(_), Op::Div, Vec2(_, _) | Vec3(_, _, _) | Vec4(_, _, _, _)) => {
                     // TODO: check this in static analysis pass
-                    report(ErrorType::Runtime, ast.line, "Unexpected float on lhs and vector on rhs")
+                    report(ErrorType::Runtime, line, "Unexpected float on lhs and vector on rhs")
                 }
                 (_, Op::Sub, _) => lval.zipmap(rval, |l, r| l - r),
                 (_, Op::Add, _) => lval.zipmap(rval, |l, r| l + r),
@@ -664,7 +786,7 @@ pub fn eval(ast: &Ast, e: Env, r: &Rodeo) -> EvalRet {
                 (Float(l), Op::LessEq, Float(r)) => Float((l >= r) as i32 as f32),
                 _ => report(
                     ErrorType::Runtime,
-                    ast.line,
+                    line,
                     format!("Unexpected scalar/vector binary operation relationship, got {:#?} {:#?} {:#?}", lval, op, rval).as_str(),
                 )
             }))
@@ -680,7 +802,7 @@ pub fn eval(ast: &Ast, e: Env, r: &Rodeo) -> EvalRet {
                 Val::Float(_) => eval(&false_ret, env, r),
                 _ => report(
                     ErrorType::Runtime,
-                    ast.line,
+                    line,
                     format!(
                         "Expected scalar conditional in if expression, got {:#?}",
                         condval
@@ -703,12 +825,12 @@ pub fn eval(ast: &Ast, e: Env, r: &Rodeo) -> EvalRet {
                 BuiltIn::Mat2 => todo!(),
                 // BuiltIn::Mat2 => {
                 //     if len != 2 {
-                //         report(ErrorType::Runtime, ast.line, format!("Expected 2 inputs to mat2(vec2, vec2), got {}", len).as_str());
+                //         report(ErrorType::Runtime, line, format!("Expected 2 inputs to mat2(vec2, vec2), got {}", len).as_str());
                 //     }
 
                 //     let mat = match (vals.pop(), vals.pop()) {
                 //         (Vec2(x0, y0), Vec2(x1, y1)) => Mat2(Vec2(x0, y0), Vec2(x1, y1)),
-                //         (x, y) => report(ErrorType::Runtime, ast.line, format!("Expected mat2(vec2, vec2), got mat2({:?}, {:?})", x, y).as_str())
+                //         (x, y) => report(ErrorType::Runtime, line, format!("Expected mat2(vec2, vec2), got mat2({:?}, {:?})", x, y).as_str())
                 //     };
 
                 //     EvalRet::new(env).with_val(Some(mat))
@@ -719,14 +841,14 @@ pub fn eval(ast: &Ast, e: Env, r: &Rodeo) -> EvalRet {
                     if len != 2 {
                         report(
                             ErrorType::Runtime,
-                            ast.line,
+                            line,
                             format!("Expected 2 inputs to dist(a, b), got {}", len).as_str(),
                         )
                     }
 
                     let distance = match vals.pop().unwrap().dist(vals.pop().unwrap()) {
                         Ok(distance) => distance,
-                        Err(error) => report(ErrorType::Runtime, ast.line, error.as_str()),
+                        Err(error) => report(ErrorType::Runtime, line, error.as_str()),
                     };
 
                     EvalRet::new(env).with_val(Some(distance))
@@ -735,7 +857,7 @@ pub fn eval(ast: &Ast, e: Env, r: &Rodeo) -> EvalRet {
                     if len != 1 {
                         report(
                             ErrorType::Runtime,
-                            ast.line,
+                            line,
                             format!("Expected 1 input to sin(a), got {}", len).as_str(),
                         )
                     }
@@ -746,14 +868,14 @@ pub fn eval(ast: &Ast, e: Env, r: &Rodeo) -> EvalRet {
                     if len != 2 {
                         report(
                             ErrorType::Runtime,
-                            ast.line,
+                            line,
                             format!("Expected 2 inputs to pow(a, b), got {}", len).as_str(),
                         )
                     }
 
                     let pow = match vals.pop().unwrap().dist(vals.pop().unwrap()) {
                         Ok(distance) => distance,
-                        Err(error) => report(ErrorType::Runtime, ast.line, error.as_str()),
+                        Err(error) => report(ErrorType::Runtime, line, error.as_str()),
                     };
 
                     EvalRet::new(env).with_val(Some(pow))
@@ -788,4 +910,17 @@ pub fn eval(ast: &Ast, e: Env, r: &Rodeo) -> EvalRet {
             }
         }
     }
+}
+
+#[test]
+fn constant_folding() {
+    assert_eq!(
+        crate::string_to_ast("return [1 + 2; 4]").1.ast,
+        crate::string_to_ast("return [3; 4]").1.ast,
+    );
+
+    assert_eq!(
+        crate::string_to_ast("return { give [1 + 2; 4] }").1.ast,
+        crate::string_to_ast("return [3; 4]").1.ast,
+    );
 }

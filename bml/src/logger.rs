@@ -7,6 +7,7 @@ pub enum ErrorType {
     Parse,
     Preprocessor,
     Runtime,
+    Scanner
 }
 
 pub fn info(message: &str) {

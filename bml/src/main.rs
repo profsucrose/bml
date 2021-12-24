@@ -1,7 +1,7 @@
 use std::process;
 
 use ast::Val;
-use bml::ast::{self, eval};
+use bml::{ast::{self, eval}, logger::{ErrorType, report}};
 use image::io::Reader as ImageReader;
 
 macro_rules! gen_runtime_idents {
@@ -107,8 +107,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         frame.push((255.0 * z) as u8);
                         frame.push((255.0 * w) as u8);
                     }
-                    None => panic!("scripts must return new pixel color"),
-                    Some(_) => panic!("pixel colors returned must be 4 dimensional"),
+                    None => report(ErrorType::Runtime, ast.line, "Expected program to return vec4, got nothing"),
+                    Some(val) => report(ErrorType::Runtime, ast.line, format!("Returned color must be vec4, got {:?}", val).as_str()),
                 };
                 ret.env
             });

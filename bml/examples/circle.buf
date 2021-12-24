@@ -8,13 +8,30 @@ x = sin(frame)
 y = cos(frame)
 
 # user-defined macros
-macro add_one(x) x + 1
-macro add_one(x) {
-    give x + add_one(x)
+macro add_two(y) {
+    give y + 2
 }
 
-x = 10
-y = add_one(x)
+macro add_one(x) x + 1
+
+y = 2
+
+macro add_one(x, y) {
+    z = x + y
+
+    // w = add_two(2)
+
+    give z.y + y.x
+}
+
+vec = [1, 2, 3]
+vec.y = 2
+vec.yyz = [ 2, 2, 3 ]
+vec.zxy = [ 3, 1, 2 ]
+vec.zyyy
+
+my_variable = 10
+y = add_one([1, 2], [3, 4])
 
 uv = coord / resolution
 distance = dist(uv, [0.5, 0.5])

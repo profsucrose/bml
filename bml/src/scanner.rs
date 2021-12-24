@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{token::Token, token_type::TokenType};
+use crate::{token::Token, token_type::TokenType, logger::{ErrorType, report}};
 
 pub struct Scanner {
     source: String,
@@ -117,9 +117,7 @@ impl Scanner {
                 } else if c.is_alphabetic() {
                     self.identifier();
                 } else {
-                    // error
-                    panic!("[line {}] Error: Unexpected character '{}'", self.line, c);
-                    // process::exit(1);
+                    report(ErrorType::Scanner, self.line, format!("Unexpected character '{}'", c).as_str())
                 }
             }
         }

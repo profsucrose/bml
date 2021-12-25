@@ -1,4 +1,5 @@
 use core::panic;
+use image::{ImageBuffer, Rgba};
 use lasso::{Rodeo, Spur};
 use std::collections::HashMap;
 
@@ -586,6 +587,9 @@ impl Val {
 
 #[derive(Debug, Clone, Copy)]
 pub enum BuiltIn {
+    // image utilities
+    Sample,
+
     // vector utilities
     Dist,
     Radians,
@@ -666,17 +670,56 @@ impl Ast {
     }
 }
 
-#[derive(Default, Debug)]
-pub struct Env {
-    vars: HashMap<Spur, Val>,
-    pub ret: Option<Val>,
-    parent: Option<Box<Env>>,
+#[derive(Debug, Clone)]
+pub struct Sampler<'a> {
+    image: &'a ImageBuffer<Rgba<u8>, Vec<u8>>,
+    width: u32,
+    height: u32
 }
 
-impl Env {
+impl<'a> Sampler<'a> {
+    pub fn from(image: &'a ImageBuffer<Rgba<u8>, Vec<u8>>) -> Sampler {
+        let (width, height) = image.dimensions();
+
+        Sampler { image, width, height }
+    }
+
+    pub fn sample(&self, x: f32, y: f32) -> Val {
+        if x > 1.0 || x < 0.0 {
+            return Vec4(0.0, 0.0, 0.0, 0.0);
+        }
+        
+        if y > 1.0 || y < 0.0 {
+            return Vec4(0.0, 0.0, 0.0, 0.0);
+        }
+
+        let [r, g, b, a] = self.image.get_pixel((x * ((self.width - 1) as f32)) as u32, (y * ((self.height - 1) as f32)) as u32).0;
+
+        Vec4(r as f32 / 255.0, g as f32 / 255.0,  b as f32 / 255.0, a as f32 / 255.0)
+    }
+}
+
+#[derive(Default, Debug)]
+pub struct Env<'a> {
+    vars: HashMap<Spur, Val>,
+    sampler: Option<Sampler<'a>>,
+    pub ret: Option<Val>,
+    parent: Option<Box<Env<'a>>>,
+}
+
+impl<'a> Env<'a> {
+    pub fn with_sampler(sampler: Sampler) -> Env {
+        let mut env = Env::default();
+
+        env.sampler = Some(sampler);
+
+        env
+    }
+
     fn child(self) -> Self {
         Self {
             vars: Default::default(),
+            sampler: self.sampler.clone(),
             parent: Some(Box::new(self)),
             ret: None,
         }
@@ -705,19 +748,19 @@ impl Env {
     }
 }
 
-pub struct EvalRet {
-    pub env: Env,
+pub struct EvalRet<'a> {
+    pub env: Env<'a>,
     val: Option<Val>,
     give: Option<Val>,
 }
 
-struct ERVal {
-    env: Env,
+struct ERVal<'a> {
+    env: Env<'a>,
     val: Val,
 }
 
-impl EvalRet {
-    fn new(env: Env) -> Self {
+impl<'a> EvalRet<'a> {
+    fn new(env: Env<'a>) -> Self {
         Self {
             env,
             val: None,
@@ -736,7 +779,7 @@ impl EvalRet {
         }
     }
 
-    fn needs_val(self) -> ERVal {
+    fn needs_val(self) -> ERVal<'a> {
         ERVal {
             env: self.env,
             val: need_val(self.val),
@@ -803,7 +846,7 @@ macro_rules! builtin_three_args {
     }};
 }
 
-pub fn eval(ast: &Ast, e: Env, r: &Rodeo) -> EvalRet {
+pub fn eval<'a>(ast: &Ast, e: Env<'a>, r: &Rodeo) -> EvalRet<'a> {
     use AstNode::*;
 
     match &ast.node {
@@ -1113,6 +1156,26 @@ pub fn eval(ast: &Ast, e: Env, r: &Rodeo) -> EvalRet {
                     };
 
                     EvalRet::new(env).with_val(Some(mat))
+                }
+                BuiltIn::Sample => {
+                    if len != 1 {
+                        report(
+                            ErrorType::Runtime,
+                            ast.line,
+                            format!(
+                                "Expected 1 input to sample(vec2), got {}",
+                                len
+                            )
+                            .as_str(),
+                        );
+                    }
+
+                    let pixel = match (vals.pop().unwrap(), &env.sampler) {
+                        (Vec2(x, y), Some(sampler)) => sampler.sample(x, y),
+                        (x, _) => report(ErrorType::Runtime, ast.line, format!("Expected sample(vec2), got sample({:?}", x).as_str())
+                    };
+
+                    EvalRet::new(env).with_val(Some(pixel))
                 }
                 BuiltIn::Dist => {
                     builtin_two_args!(Val::dist, "dist", len, ast, vals, env)

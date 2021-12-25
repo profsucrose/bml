@@ -1,7 +1,7 @@
 use std::{process};
 
 use ast::Val;
-use bml::{ast::{self, eval, Ast}, logger::{ErrorType, report, help, success_image, success_eval}};
+use bml::{ast::{self, eval, Ast, Sampler}, logger::{ErrorType, report, help, success_image, success_eval}};
 use image::{io::Reader as ImageReader, DynamicImage};
 use lasso::Rodeo;
 
@@ -63,19 +63,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (mut rodeo, ast) = compile(script.as_str()).unwrap();
 
+    let buffer = match &image {
+        Some(path) => ImageReader::open(path)?.decode()?.to_rgba8(),
+        None => DynamicImage::new_rgba8(width.unwrap() as u32, height.unwrap() as u32).to_rgba8()
+    };
+
     let rti = RuntimeIdents::new(&mut rodeo);
-    let mut env = ast::Env::default();
+    let mut env = ast::Env::with_sampler(Sampler::from(&buffer));
 
     let frame_count = std::env::var("BML_FRAME_COUNT")
         .ok()
         .map(|x| x.parse::<usize>())
         .transpose()?
         .unwrap_or(1);
-
-    let buffer = match &image {
-        Some(path) => ImageReader::open(path)?.decode()?.to_rgba8(),
-        None => DynamicImage::new_rgba8(width.unwrap() as u32, height.unwrap() as u32).to_rgba8()
-    };
 
     let (width, height) = buffer.dimensions();
 
@@ -174,5 +174,8 @@ fn compile(script: &str) -> Result<(Rodeo, Ast), Box<dyn std::error::Error>> {
     let file = std::fs::read_to_string(&script).expect(format!("Could not find file '{}'", script).as_str());
     let raw = bml::Scanner::from(file).scan();
     let expanded = bml::PreProcessor::from(raw).process();
+
+    // println!("{:?}", expanded.iter().map(|x| format!("{} ", x.lexeme)).collect::<String>());
+
     Ok(bml::Parser::from(&expanded).parse())
 }

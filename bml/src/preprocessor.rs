@@ -7,7 +7,6 @@ use crate::{
     token_type::TokenType,
 };
 
-// TODO: replace w/ string interning
 pub struct PreProcessor {
     tokens: Vec<Token>,
     result: Vec<Token>,
@@ -221,18 +220,24 @@ impl PreProcessor {
                         } => {
                             parens -= 1;
                             if parens == 0 {
+                                // closing paren, not part of arg
                                 if !current_arg.is_empty() {
                                     // move current_arg as should no longer be used
                                     args.push(current_arg);
                                 }
 
                                 break;
+                            } else {
+                                current_arg.push(token.clone());
                             }
                         }
                         Token {
                             token_type: TokenType::LeftParen,
                             ..
-                        } => parens += 1,
+                        } => {
+                            parens += 1;
+                            current_arg.push(token.clone());
+                        }
                         Token {
                             token_type: TokenType::Comma,
                             ..
@@ -317,7 +322,6 @@ impl PreProcessor {
         self.tokens.get(self.current).unwrap().to_owned()
     }
 
-    // TODO: DRYer error handling
     fn consume(&mut self, token_type: TokenType) -> Option<Token> {
         let token = self.peek();
         if token.token_type == token_type {

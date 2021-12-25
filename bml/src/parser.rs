@@ -7,26 +7,6 @@ use crate::logger::{report, ErrorType};
 use crate::token::Token;
 use crate::token_type::TokenType;
 
-/*
-    precedence rules:
-
-    stmt: expr if expr else expr | assign | "return" expr
-    assign: identifier "=" expr
-    builtin: dist
-    arguments: argument ("," argument)*
-    argument: expr
-    expr: equality | block | call
-    block: "{" blockStmt+ "}"
-    blockStmt: stmt | "give" expr
-    equality: comparison ("==" comparison)*
-    comparison: term (("<" | ">" | "<=" | ">=") term)*
-    term: factor (("+" | "-") factor)*
-    factor: access (("*" | "/") access)*
-    access: primary ("." ("x"|"y"|"z"|"w")*)
-    primary: identifier | literal | "(" expression ")" | access | call
-    call: builtin "(" arguments? ")"
-*/
-
 pub struct Parser<'a> {
     tokens: &'a Vec<Token>,
     current: usize,
@@ -46,6 +26,7 @@ macro_rules! builtins {
 impl<'a> Parser<'a> {
     pub fn from(tokens: &Vec<Token>) -> Parser {
         let builtins = builtins!(
+            ("sample", BuiltIn::Sample),
             ("dist", BuiltIn::Dist),
             ("radians", BuiltIn::Radians),
             ("degrees", BuiltIn::Degrees),
@@ -418,7 +399,7 @@ impl<'a> Parser<'a> {
         if self.match_token(TokenType::LeftParen) {
             let expression = self.r#if();
 
-            self.consume(TokenType::RightParen, "Expect ')' after expression");
+            self.consume(TokenType::RightParen, "Unclosed ')' in expression");
 
             // handle parenthesis
             return Ast::new(
@@ -641,7 +622,6 @@ impl<'a> Parser<'a> {
     }
 
     fn peek(&self) -> &Token {
-        // TODO: clean error
         self.tokens.get(self.current).expect("Unexpected EOF")
     }
 }

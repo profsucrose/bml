@@ -21,7 +21,7 @@ gen_runtime_idents!(resolution, coord, frag, frame, frame_count);
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
 
-    let (script, image, output_path, width, height) = match args.next().as_deref()  {
+    let (script, image, output_path, width, height, frame_count) = match args.next().as_deref()  {
         None => {
             help();
         },
@@ -40,14 +40,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         
             process::exit(0)
         },
-        Some("process") => match (args.next(), args.next(), args.next()) {
-            (Some(script), Some(image), output) => (script, Some(image), output, None, None),
+        Some("process") => match (args.next(), args.next(), args.next(), args.next()) {
+            (Some(script), Some(image), Some(frame_count), output) => match frame_count.parse::<usize>() {
+                Ok(frame_count) => (script, Some(image), output, None, None, frame_count),
+                _ => help()
+            }
             _ => help()
         }
-        Some("new") => match (args.next(), args.next(), args.next(), args.next()) {
-            (Some(script), Some(width), Some(height), Some(output)) => match (width.parse::<usize>(), height.parse::<usize>()) {
-                (Ok(width), Ok(height)) => {
-                    (script, None, Some(output), Some(width), Some(height))
+        Some("new") => match (args.next(), args.next(), args.next(), args.next(), args.next()) {
+            (Some(script), Some(width), Some(height), Some(frame_count), Some(output)) => match (frame_count.parse::<usize>(), width.parse::<usize>(), height.parse::<usize>()) {
+                (Ok(frames), Ok(width), Ok(height)) => {
+                    (script, None, Some(output), Some(width), Some(height), frames)
                 },
                 _ => help()
             }
@@ -70,12 +73,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let rti = RuntimeIdents::new(&mut rodeo);
     let mut env = ast::Env::with_sampler(Sampler::from(&buffer));
-
-    let frame_count = std::env::var("BML_FRAME_COUNT")
-        .ok()
-        .map(|x| x.parse::<usize>())
-        .transpose()?
-        .unwrap_or(1);
 
     let (width, height) = buffer.dimensions();
 
@@ -163,7 +160,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .map(|img| image::Frame::from_parts(img, 0, 0, delay)),
             )?;
         }
-    }
+    } 
 
     success_image(out_path.as_str());
 

@@ -42,9 +42,9 @@ pub fn help() -> ! {
     println!(" Usage: 
   bml eval <script>
       Evaluate script and print the returned result.
-  bml process <script> <image> [output_path]
+  bml process <script> <image> <frames> [output_path]
       Process and manipulate an image with a script and output the result, either at an automatically determined path or at a specified path.
-  bml new <script> <width> <height> <output_path>
+  bml new <script> <width> <height> <frames> <output_path>
       Generate new image with a given width and height with a script and write the result to a path.");
     println!();
     println!(" Process and manipulate images, or generate new ones, using the Buffer Manipulation Language.");

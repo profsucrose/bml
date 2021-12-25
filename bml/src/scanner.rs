@@ -165,8 +165,6 @@ impl Scanner {
 
         match (self.peek(), self.peek_next()) {
             (Some('.'), Some(next)) => {
-                println!("Check passed");
-
                 if next.is_digit(10) {
                     self.advance();
 

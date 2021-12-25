@@ -206,8 +206,6 @@ impl PreProcessor {
         let mut current_arg = Vec::new();
         let mut args = Vec::new();
 
-        println!("Calling macro: {:?}", call);
-
         let mut parens = 1;
 
         loop {
@@ -216,7 +214,6 @@ impl PreProcessor {
                     report(ErrorType::Preprocessor, line, "Expected ')' in macro call");
                 }
                 Some(token) => {
-                    println!("New token: {:?} {}", token, parens);
                     match token {
                         Token {
                             token_type: TokenType::RightParen,
@@ -224,7 +221,6 @@ impl PreProcessor {
                         } => {
                             parens -= 1;
                             if parens == 0 {
-                                println!("Exiting loop {:?}", parens);
                                 if !current_arg.is_empty() {
                                     // move current_arg as should no longer be used
                                     args.push(current_arg);

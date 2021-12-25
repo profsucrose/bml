@@ -105,7 +105,11 @@ impl<'a> Parser<'a> {
             self.lines.push(statement);
         }
 
-        let prev = self.previous().line;
+        let prev = if self.tokens.len() > 0 {
+            0
+        } else {
+            self.previous().line
+        };
         let Self { rodeo, lines, .. } = self;
         (rodeo, Ast::new(AstNode::Block(lines), prev))
     }
@@ -128,21 +132,48 @@ impl<'a> Parser<'a> {
 
     fn repeat(&mut self) -> Ast {
         if !self.match_token(TokenType::Number) {
-            report(ErrorType::Parse, self.peek().line, format!("Expected positive number literal in repeat statement, got '{}'", self.peek().lexeme).as_str());
+            report(
+                ErrorType::Parse,
+                self.peek().line,
+                format!(
+                    "Expected positive number literal in repeat statement, got '{}'",
+                    self.peek().lexeme
+                )
+                .as_str(),
+            );
         }
 
         let times = match self.previous().lexeme.parse::<f32>() {
             Ok(times) => times,
-            Err(_) => report(ErrorType::Parse, self.previous().line, format!("Expected number literal in repeat statement, got '{}'", self.previous().lexeme).as_str())
+            Err(_) => report(
+                ErrorType::Parse,
+                self.previous().line,
+                format!(
+                    "Expected number literal in repeat statement, got '{}'",
+                    self.previous().lexeme
+                )
+                .as_str(),
+            ),
         };
 
         if !self.match_token(TokenType::LeftBracket) {
-            report(ErrorType::Parse, self.previous().line, format!("Expected '{{' in repeat block, got '{}'", self.previous().lexeme).as_str());
+            report(
+                ErrorType::Parse,
+                self.previous().line,
+                format!(
+                    "Expected '{{' in repeat block, got '{}'",
+                    self.previous().lexeme
+                )
+                .as_str(),
+            );
         }
 
         let block = self.block();
 
-        Ast::new(AstNode::Repeat(times, Box::new(block)), self.previous().line)
+        Ast::new(
+            AstNode::Repeat(times, Box::new(block)),
+            self.previous().line,
+        )
     }
 
     fn r#if(&mut self) -> Ast {
@@ -489,7 +520,9 @@ impl<'a> Parser<'a> {
         let sign = if positive { 1.0 } else { -1.0 };
 
         Ast::new(
-            AstNode::V(Val::Float(sign * self.previous().lexeme.parse::<f32>().unwrap())),
+            AstNode::V(Val::Float(
+                sign * self.previous().lexeme.parse::<f32>().unwrap(),
+            )),
             self.previous().line,
         )
     }

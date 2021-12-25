@@ -36,6 +36,7 @@ pub enum TokenType {
     Return,
     Give,
     Macro,
+    Repeat,
 
     // literals
     Number,

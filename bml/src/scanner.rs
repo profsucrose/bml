@@ -21,6 +21,7 @@ impl Scanner {
         keywords.insert("return", TokenType::Return);
         keywords.insert("give", TokenType::Give);
         keywords.insert("macro", TokenType::Macro);
+        keywords.insert("repeat", TokenType::Repeat);
 
         keywords.insert("vec2", TokenType::Vec2);
         keywords.insert("vec3", TokenType::Vec3);
@@ -164,8 +165,6 @@ impl Scanner {
 
         match (self.peek(), self.peek_next()) {
             (Some('.'), Some(next)) => {
-                println!("Check passed");
-
                 if next.is_digit(10) {
                     self.advance();
 

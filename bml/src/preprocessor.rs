@@ -7,7 +7,6 @@ use crate::{
     token_type::TokenType,
 };
 
-// TODO: replace w/ string interning
 pub struct PreProcessor {
     tokens: Vec<Token>,
     result: Vec<Token>,
@@ -206,75 +205,89 @@ impl PreProcessor {
         let mut current_arg = Vec::new();
         let mut args = Vec::new();
 
-        let mut parens = 0;
+        let mut parens = 1;
 
         loop {
             match call.get(cursor) {
                 None => {
                     report(ErrorType::Preprocessor, line, "Expected ')' in macro call");
                 }
-                Some(token) => match token {
-                    Token {
-                        token_type: TokenType::RightParen,
-                        ..
-                    } => {
-                        parens -= 1;
-                        if parens == 0 {
-                            if !current_arg.is_empty() {
-                                // move current_arg as should no longer be used
-                                args.push(current_arg);
-                            }
-
-                            break;
-                        }
-                    }
-                    Token {
-                        token_type: TokenType::LeftParen,
-                        ..
-                    } => parens += 1,
-                    Token {
-                        token_type: TokenType::Comma,
-                        ..
-                    } => {
-                        args.push(current_arg.clone());
-                        current_arg.clear();
-                    }
-                    Token {
-                        token_type: TokenType::Identifier,
-                        ..
-                    } => {
-                        if self.macros.contains_key(&token.lexeme) {
-                            let start = cursor;
-
-                            loop {
-                                match call.get(cursor) {
-                                    Some(Token {
-                                        token_type: TokenType::RightParen,
-                                        ..
-                                    }) => break,
-                                    None => {
-                                        report(
-                                            ErrorType::Preprocessor,
-                                            line,
-                                            "Expected closing ')' in macro call",
-                                        );
-                                    }
-                                    _ => cursor += 1,
+                Some(token) => {
+                    match token {
+                        Token {
+                            token_type: TokenType::RightParen,
+                            ..
+                        } => {
+                            parens -= 1;
+                            if parens == 0 {
+                                // closing paren, not part of arg
+                                if !current_arg.is_empty() {
+                                    // move current_arg as should no longer be used
+                                    args.push(current_arg);
                                 }
+
+                                break;
+                            } else {
+                                current_arg.push(token.clone());
                             }
+                        }
+                        Token {
+                            token_type: TokenType::LeftParen,
+                            ..
+                        } => {
+                            parens += 1;
+                            current_arg.push(token.clone());
+                        }
+                        Token {
+                            token_type: TokenType::Comma,
+                            ..
+                        } => {
+                            args.push(current_arg.clone());
+                            current_arg.clear();
+                        }
+                        Token {
+                            token_type: TokenType::Identifier,
+                            ..
+                        } => {
+                            if self.macros.contains_key(&token.lexeme) {
+                                let start = cursor;
 
-                            let nested_call = call[start..cursor].to_owned();
-                            let mut expansion = self.expand_macro(token.line, &nested_call);
+                                loop {
+                                    match call.get(cursor) {
+                                        Some(Token {
+                                            token_type: TokenType::RightParen,
+                                            ..
+                                        }) => {
+                                            cursor += 1;
+                                            break
+                                        },
+                                        None => {
+                                            report(
+                                                ErrorType::Preprocessor,
+                                                line,
+                                                "Expected closing ')' in macro call",
+                                            );
+                                        }
+                                        _ => cursor += 1,
+                                    }
+                                }
 
-                            current_arg.append(&mut expansion);
-                        } else {
+                                let nested_call = call[start..cursor].to_owned();
+                                let mut expansion = self.expand_macro(token.line, &nested_call);
+
+                                current_arg.append(&mut expansion);
+
+                                // cursor is already incremented
+                                continue
+                            } else {
+                                current_arg.push(token.clone());
+                            }
+                        }
+                        _ => {
                             current_arg.push(token.clone());
                         }
                     }
-                    _ => {
-                        current_arg.push(token.clone());
-                    }
-                },
+                }
             }
 
             cursor += 1;
@@ -309,7 +322,6 @@ impl PreProcessor {
         self.tokens.get(self.current).unwrap().to_owned()
     }
 
-    // TODO: DRYer error handling
     fn consume(&mut self, token_type: TokenType) -> Option<Token> {
         let token = self.peek();
         if token.token_type == token_type {

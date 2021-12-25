@@ -1,8 +1,11 @@
 use std::process;
 
-use bml::ast::{self, Val};
-use bml::logger::{report, ErrorType};
-use image::io::Reader as ImageReader;
+use ast::Val;
+use bml::{
+    ast::{self, eval, Sampler},
+    logger::{help, report, success_eval, success_image, ErrorType},
+};
+use image::{io::Reader as ImageReader, DynamicImage};
 
 macro_rules! gen_runtime_idents {
     ($($x:ident $(,)? )*) => {
@@ -19,45 +22,76 @@ gen_runtime_idents!(resolution, coord, frag, frame, frame_count);
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
-    let script_name = args.next().expect("Expected script name");
-    let img_path = args.next().expect("Expected image path");
-    let eval_flag = args.next();
 
+    let (script, image, output_path, width, height, frame_count) = match args.next().as_deref() {
+        None => {
+            help();
+        }
+        Some("eval") => {
+            let script = if let Some(script) = args.next() {
+                script
+            } else {
+                help();
+            };
+
+            let (rodeo, ast) = bml::string_to_ast(std::fs::read_to_string(script)?);
+            let env = ast::Env::default();
+            let output = eval(&ast, env, &rodeo).env.ret.take();
+
+            success_eval(output.map(|v| format!("{:?}", v)));
+
+            process::exit(0)
+        }
+        Some("process") => match (args.next(), args.next(), args.next(), args.next()) {
+            (Some(script), Some(image), Some(frame_count), output) => {
+                match frame_count.parse::<usize>() {
+                    Ok(frame_count) => (script, Some(image), output, None, None, frame_count),
+                    _ => help(),
+                }
+            }
+            _ => help(),
+        },
+        Some("new") => match (
+            args.next(),
+            args.next(),
+            args.next(),
+            args.next(),
+            args.next(),
+        ) {
+            (Some(script), Some(width), Some(height), Some(frame_count), Some(output)) => match (
+                frame_count.parse::<usize>(),
+                width.parse::<usize>(),
+                height.parse::<usize>(),
+            ) {
+                (Ok(frames), Ok(width), Ok(height)) => (
+                    script,
+                    None,
+                    Some(output),
+                    Some(width),
+                    Some(height),
+                    frames,
+                ),
+                _ => help(),
+            },
+            _ => help(),
+        },
+        _ => help(),
+    };
+
+    // should be no additional arguments
     if args.next().is_some() {
-        println!("Usage: bml [image] [script] <options>");
-        process::exit(1);
+        help();
     }
 
-    let (mut rodeo, ast) = bml::string_to_ast(std::fs::read_to_string(&script_name)?);
+    let (mut rodeo, ast) = bml::string_to_ast(std::fs::read_to_string(&script)?);
+
+    let buffer = match &image {
+        Some(path) => ImageReader::open(path)?.decode()?.to_rgba8(),
+        None => DynamicImage::new_rgba8(width.unwrap() as u32, height.unwrap() as u32).to_rgba8(),
+    };
 
     let rti = RuntimeIdents::new(&mut rodeo);
-    let mut env = ast::Env::default();
-
-    if let Some(flag) = eval_flag {
-        if flag == "--eval" {
-            let output = ast::eval(&ast, env, &rodeo).env.ret.take();
-
-            println!("return={:?}", output);
-
-            process::exit(0);
-        } else {
-            println!("Invalid flag '{}' (expected '--eval')", flag);
-
-            process::exit(1);
-        }
-    }
-
-    let frame_count = std::env::var("BML_FRAME_COUNT")
-        .ok()
-        .map(|x| x.parse::<usize>())
-        .transpose()?
-        .unwrap_or(1);
-
-    let mut image = ImageReader::open(&img_path)?.decode()?;
-
-    let buffer = image
-        .as_mut_rgba8()
-        .expect("Couldn't get pixel buffer from image");
+    let mut env = ast::Env::with_sampler(Sampler::from(&buffer));
 
     let (width, height) = buffer.dimensions();
 
@@ -74,6 +108,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .enumerate_pixels()
             .fold(env, |mut env, (x, y, rgba)| {
                 let [r, g, b, a] = rgba.0;
+
                 env.set(rti.coord, Val::Vec2(x as _, y as _));
                 env.set(
                     rti.frag,
@@ -84,12 +119,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         a as f32 / 255.0,
                     ),
                 );
+
                 let mut ret = ast::eval(&ast, env, &rodeo);
+
                 match ret.env.ret.take() {
                     Some(Val::Vec4(x, y, z, w)) => {
-                        // println!("{:?}, {:?}", ret.env.get(2), ret.env.get(5));
-                        // println!("{:?}, {:?}", ret.env.get(5), ret.env.get(6));
-                        // println!("{}, {}, {}, {}", x, y, z, w);
                         frame.push((255.0 * x) as u8);
                         frame.push((255.0 * y) as u8);
                         frame.push((255.0 * z) as u8);
@@ -117,17 +151,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         image::ImageBuffer::from_raw(width, height, bytes).unwrap()
     };
 
-    let mut out_path = String::new();
+    let mut out_path = match output_path {
+        Some(output) => output,
+        None => {
+            let mut path = String::new();
 
-    out_path.push_str(
-        std::path::Path::new(&script_name)
-            .file_stem()
-            .and_then(|x| x.to_str())
-            .expect("Could not extract file stem from script name"),
-    );
+            path.push_str(
+                std::path::Path::new(&script)
+                    .file_stem()
+                    .and_then(|x| x.to_str())
+                    .expect("Could not extract file stem from script name"),
+            );
 
-    out_path.push('_');
-    out_path.push_str(&img_path);
+            path.push('_');
+            path.push_str(&image.unwrap());
+
+            path
+        }
+    };
 
     match frame_count {
         0 => panic!("YO! What the FUCK am i supposed to do with 0 frames?"),
@@ -148,7 +189,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    println!("Output to: {}", out_path);
+    success_image(out_path.as_str());
 
     Ok(())
 }

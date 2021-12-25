@@ -7,26 +7,6 @@ use crate::logger::{report, ErrorType};
 use crate::token::Token;
 use crate::token_type::TokenType;
 
-/*
-    precedence rules:
-
-    stmt: expr if expr else expr | assign | "return" expr
-    assign: identifier "=" expr
-    builtin: dist
-    arguments: argument ("," argument)*
-    argument: expr
-    expr: equality | block | call
-    block: "{" blockStmt+ "}"
-    blockStmt: stmt | "give" expr
-    equality: comparison ("==" comparison)*
-    comparison: term (("<" | ">" | "<=" | ">=") term)*
-    term: factor (("+" | "-") factor)*
-    factor: access (("*" | "/") access)*
-    access: primary ("." ("x"|"y"|"z"|"w")*)
-    primary: identifier | literal | "(" expression ")" | access | call
-    call: builtin "(" arguments? ")"
-*/
-
 pub struct Parser<'a> {
     tokens: &'a Vec<Token>,
     current: usize,
@@ -46,6 +26,7 @@ macro_rules! builtins {
 impl<'a> Parser<'a> {
     pub fn from(tokens: &Vec<Token>) -> Parser {
         let builtins = builtins!(
+            ("sample", BuiltIn::Sample),
             ("dist", BuiltIn::Dist),
             ("radians", BuiltIn::Radians),
             ("degrees", BuiltIn::Degrees),
@@ -105,7 +86,11 @@ impl<'a> Parser<'a> {
             self.lines.push(statement);
         }
 
-        let prev = self.previous().line;
+        let prev = if self.tokens.len() > 0 {
+            0
+        } else {
+            self.previous().line
+        };
         let Self { rodeo, lines, .. } = self;
         (rodeo, SrcAst::new(Ast::Block(lines), prev))
     }
@@ -114,11 +99,59 @@ impl<'a> Parser<'a> {
         if self.match_token(TokenType::Identifier) {
             return self.assign();
         }
+
         if self.match_token(TokenType::Return) {
             return self.r#return();
         }
 
+        if self.match_token(TokenType::Repeat) {
+            return self.repeat();
+        }
+
         self.r#if()
+    }
+
+    fn repeat(&mut self) -> SrcAst {
+        if !self.match_token(TokenType::Number) {
+            report(
+                ErrorType::Parse,
+                self.peek().line,
+                format!(
+                    "Expected positive number literal in repeat statement, got '{}'",
+                    self.peek().lexeme
+                )
+                .as_str(),
+            );
+        }
+
+        let times = match self.previous().lexeme.parse::<f32>() {
+            Ok(times) => times,
+            Err(_) => report(
+                ErrorType::Parse,
+                self.previous().line,
+                format!(
+                    "Expected number literal in repeat statement, got '{}'",
+                    self.previous().lexeme
+                )
+                .as_str(),
+            ),
+        };
+
+        if !self.match_token(TokenType::LeftBracket) {
+            report(
+                ErrorType::Parse,
+                self.previous().line,
+                format!(
+                    "Expected '{{' in repeat block, got '{}'",
+                    self.previous().lexeme
+                )
+                .as_str(),
+            );
+        }
+
+        let block = self.block();
+
+        SrcAst::new(Ast::Repeat(times, Box::new(block)), self.previous().line)
     }
 
     fn r#if(&mut self) -> SrcAst {
@@ -367,7 +400,7 @@ impl<'a> Parser<'a> {
         if self.match_token(TokenType::LeftParen) {
             let expression = self.r#if();
 
-            self.consume(TokenType::RightParen, "Expect ')' after expression");
+            self.consume(TokenType::RightParen, "Unclosed ')' in expression");
 
             // handle parenthesis
             return SrcAst::new(
@@ -379,6 +412,10 @@ impl<'a> Parser<'a> {
             );
         }
 
+        if self.match_token(TokenType::LeftBracket) {
+            return self.block();
+        }
+
         if self.match_token(TokenType::Identifier) {
             return self.identity();
         }
@@ -388,8 +425,16 @@ impl<'a> Parser<'a> {
 
     fn literal(&mut self) -> SrcAst {
         // number literal
+        if self.check(TokenType::Minus) && self.check_next(TokenType::Number) {
+            // consume - and number
+            self.advance();
+            self.advance();
+
+            return self.number(false);
+        }
+
         if self.match_token(TokenType::Number) {
-            return self.number();
+            return self.number(true);
         }
 
         if self.match_token(TokenType::LeftSquare) {
@@ -412,7 +457,7 @@ impl<'a> Parser<'a> {
                 "Expected scalar literal as length in vector",
             );
 
-            let length = self.number();
+            let length = self.number(true);
 
             self.consume(
                 TokenType::RightSquare,
@@ -453,9 +498,13 @@ impl<'a> Parser<'a> {
         )
     }
 
-    fn number(&mut self) -> SrcAst {
+    fn number(&mut self, positive: bool) -> SrcAst {
+        let sign = if positive { 1.0 } else { -1.0 };
+
         SrcAst::new(
-            Ast::V(Val::Float(self.previous().lexeme.parse::<f32>().unwrap())),
+            Ast::V(Val::Float(
+                sign * self.previous().lexeme.parse::<f32>().unwrap(),
+            )),
             self.previous().line,
         )
     }
@@ -557,6 +606,10 @@ impl<'a> Parser<'a> {
         self.tokens[self.current - 1].clone()
     }
 
+    fn check_next(&self, token_type: TokenType) -> bool {
+        self.current + 1 < self.tokens.len() && self.peek_next().token_type == token_type
+    }
+
     fn check(&self, token_type: TokenType) -> bool {
         !self.at_end() && self.peek().token_type == token_type
     }
@@ -570,7 +623,6 @@ impl<'a> Parser<'a> {
     }
 
     fn peek(&self) -> &Token {
-        // TODO: clean error
         self.tokens.get(self.current).expect("Unexpected EOF")
     }
 }

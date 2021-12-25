@@ -1,0 +1,28 @@
+macro complex_mult(a, b) {
+    give [a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x]
+}
+
+macro complex_abs(complex) {
+    give sqrt(pow(complex.x, 2.0) + pow(complex.y, 2.0))
+}
+
+z = coord / resolution
+z = [mix(-2, 2, z.x), mix(-1, 1, z.y)] 
+c = [-0.12, -0.77]
+
+abs = 0
+
+n = 0
+
+repeat 100 {
+    {
+        abs = complex_abs(z)
+        z = complex_mult(z, z) + c
+        n = n + 1
+    } if abs <= 2 else {}
+}
+
+col = n / 100
+return [col, col, col, 1]
+
+

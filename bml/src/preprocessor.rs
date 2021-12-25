@@ -75,26 +75,39 @@ impl PreProcessor {
 
                     // read to rest of line for macro template expansion
 
-                    let is_block = self.peek().token_type == TokenType::LeftBracket;
+                    let mut brackets = 0;
 
-                    while !self.at_end()
-                        && (if is_block {
-                            self.peek().token_type != TokenType::RightBracket
-                        } else {
-                            self.peek().line == token.line
-                        })
-                    {
+                    while !self.at_end() && (self.peek().line == token.line || brackets > 0) {
                         let template_token = self.advance();
+
+                        match template_token.token_type {
+                            TokenType::LeftBracket => brackets += 1,
+                            TokenType::RightBracket => brackets -= 1,
+                            _ => {}
+                        };
 
                         if template_token.token_type == TokenType::Identifier
                             && self.peek().token_type == TokenType::LeftParen
                             && self.macros.contains_key(&template_token.lexeme)
                         {
                             let start = self.current - 1;
+                            self.consume(TokenType::LeftParen);
+                            let mut parens = 1;
 
-                            // TODO: make sure call is valid
-                            while self.consume(TokenType::RightParen).is_none() {
-                                self.advance();
+                            while !self.at_end() && parens > 0 {
+                                let t = self.advance();
+
+                                match t.token_type {
+                                    TokenType::LeftParen => parens += 1,
+                                    TokenType::RightParen => parens -= 1,
+                                    TokenType::RightBracket => brackets += 1,
+                                    TokenType::LeftBracket => brackets -= 1,
+                                    _ => {}
+                                };
+                            }
+
+                            if parens > 0 {
+                                report(ErrorType::Preprocessor, self.previous().line, "Expected ')' in macro definition");
                             }
 
                             let nested_call = self.tokens[start..self.current].to_owned();
@@ -108,13 +121,12 @@ impl PreProcessor {
                         }
                     }
 
-                    if is_block {
-                        if self.peek().token_type != TokenType::RightBracket {
-                            panic!("Should close w/ right bracket");
-                        }
-
-                        let token = self.advance();
-                        template.push((token.token_type, token.lexeme));
+                    if brackets > 0 {
+                        report(
+                            ErrorType::Preprocessor,
+                            self.peek().line,
+                            format!("Expected '}}' in '{}' macro definition", name.lexeme).as_str(),
+                        );
                     }
 
                     self.macros
@@ -128,9 +140,25 @@ impl PreProcessor {
                     {
                         let start = self.current - 1;
 
-                        // TODO: make sure call is valid
-                        while self.consume(TokenType::RightParen).is_none() {
-                            self.advance();
+                        self.consume(TokenType::LeftParen);
+
+                        let mut parens = 1;
+
+                        while !self.at_end() && parens > 0 {
+                            match self.advance().token_type {
+                                TokenType::LeftParen => parens += 1,
+                                TokenType::RightParen => parens -= 1,
+                                _ => {}
+                            }
+                        }
+
+                        // if reached EoF w/o parens == 0
+                        if parens != 0 {
+                            report(
+                                ErrorType::Preprocessor,
+                                self.previous().line,
+                                "Missing ')' when parsing macro call",
+                            );
                         }
 
                         let nested_call = self.tokens[start..self.current].to_owned();
@@ -157,45 +185,28 @@ impl PreProcessor {
         let name = match call.get(0) {
             Some(token) => {
                 if token.token_type != TokenType::Identifier {
-                    report(
-                        ErrorType::Preprocessor,
-                        token.line,
-                        format!(
-                            "Expected macro call to start with identifier, got '{:?}'",
-                            token.lexeme
-                        )
-                        .as_str(),
-                    );
+                    report(ErrorType::Preprocessor, token.line, format!( "Expected macro call to start with identifier, got '{:?}'", token.lexeme) .as_str());
                 }
 
                 token
             }
             None => {
-                report(
-                    ErrorType::Preprocessor,
-                    line,
-                    "Expected macro call to have non-zero length",
-                );
+                report(ErrorType::Preprocessor, line, "Expected macro call to have non-zero length");
             }
         };
 
         match call.get(1) {
-            Some(Token {
-                token_type: TokenType::LeftParen,
-                ..
-            }) => {}
+            Some(Token { token_type: TokenType::LeftParen, ..  }) => {}
             _ => {
-                report(
-                    ErrorType::Preprocessor,
-                    line,
-                    "Expected '(' in macro expansion call",
-                );
+                report(ErrorType::Preprocessor, line, "Expected '(' in macro invocation");
             }
         }
 
         let mut cursor = 2;
         let mut current_arg = Vec::new();
         let mut args = Vec::new();
+
+        let mut parens = 0;
 
         loop {
             match call.get(cursor) {
@@ -207,13 +218,20 @@ impl PreProcessor {
                         token_type: TokenType::RightParen,
                         ..
                     } => {
-                        if !current_arg.is_empty() {
-                            // move current_arg as should no longer be used
-                            args.push(current_arg);
-                        }
+                        parens -= 1;
+                        if parens == 0 {
+                            if !current_arg.is_empty() {
+                                // move current_arg as should no longer be used
+                                args.push(current_arg);
+                            }
 
-                        break;
+                            break;
+                        }
                     }
+                    Token {
+                        token_type: TokenType::LeftParen,
+                        ..
+                    } => parens += 1,
                     Token {
                         token_type: TokenType::Comma,
                         ..
@@ -273,6 +291,14 @@ impl PreProcessor {
         let token = self.peek();
         self.current += 1;
         token
+    }
+
+    fn previous(&self) -> Token {
+        if self.current == 0 {
+            panic!("Tried to call previous() at start of file");
+        }
+
+        self.tokens.get(self.current - 1).unwrap().to_owned()
     }
 
     fn peek(&self) -> Token {

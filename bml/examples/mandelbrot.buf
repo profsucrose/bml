@@ -1,0 +1,50 @@
+# testing file
+
+macro while10(cond, loop) {
+    loop if cond else {}
+    loop if cond else {}
+    loop if cond else {}
+    loop if cond else {}
+    loop if cond else {}
+    loop if cond else {}
+    loop if cond else {}
+    loop if cond else {}
+    loop if cond else {}
+    loop if cond else {}
+}
+
+macro while69(cond, loop) {
+    while10(cond, loop)
+    while10(cond, loop)
+    while10(cond, loop)
+    while10(cond, loop)
+    while10(cond, loop)
+    while10(cond, loop)
+    loop if cond else {}
+    loop if cond else {}
+    loop if cond else {}
+    loop if cond else {}
+    loop if cond else {}
+    loop if cond else {}
+    loop if cond else {}
+    loop if cond else {}
+    loop if cond else {}
+}
+
+macro and(a, b) a * b
+
+macro complex_mult(a, b) {
+    give [a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x]
+}
+
+
+z = [0, 0]
+c = [0.2, 0.2]
+
+i = 0
+while69(i < 50, {
+})
+
+col = [0, 1, 0, 1] if and(z.x > 10, z.y > 10) else [0, 0, 0, 1]
+
+return col

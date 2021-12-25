@@ -1,13 +1,222 @@
-# 4 instructions
-
-macro dot(a, b) a.x * b.x + a.y * b.y
-
-# in buf, x, y
-x = 10
-x = x + 10
-
-repeat 2.0 + 3 {
-    x = x + 10    
+macro while10(cond, loop) {
+    loop if cond else {}
+    loop if cond else {}
+    loop if cond else {}
+    loop if cond else {}
+    loop if cond else {}
+    loop if cond else {}
+    loop if cond else {}
+    loop if cond else {}
+    loop if cond else {}
+    loop if cond else {}
 }
 
-return vec4[1.0, 0.0, 1.0, 0.0]
+macro complex_mult(a, b) {
+    give [a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x]
+}
+
+macro complex_abs(complex) {
+    give sqrt(pow(complex.x, 2.0) + pow(complex.y, 2.0))
+}
+
+z = [0, 0]
+c = coord / resolution
+c = [mix(0 - 2, 1, c.x), mix(0 - 1, 1, c.y)]
+# c = [0, 0]
+
+n = 0
+
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+abs = sqrt(pow(z.x, 2.0) + pow(z.y, 2.0))
+{
+    z = [z.x * z.x - z.y * z.y, z.x * z.y + z.y * z.x] + c
+    n = n + 1
+} if abs <= 2 else {}
+
+return [n / 37, n / 37, n / 37, 1]

@@ -1,0 +1,12 @@
+# generate checkerboard
+
+macro add_one(a) a + 1
+macro neg(a) 0 - a
+
+size = 40
+pos = floor([coord.x / size, coord.y / size])
+return [1, 1, 1, 1] if mod(pos.x + mod(pos.y, 2), 2) == 1 else [0, 0, 0, 1]
+
+# uv = coord / resolution
+
+# return [1 - frag.r, 1 - frag.g, 1 - frag.b, 1] if 1 else { give 0.5 }

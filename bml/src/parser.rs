@@ -35,14 +35,59 @@ pub struct Parser<'a> {
     lines: Vec<SrcAst>,
 }
 
+macro_rules! builtins {
+    ($( ($key:expr, $value:expr) ),*) => {{
+        let mut map = HashMap::new();
+        $( map.insert(String::from($key), $value); )*
+        map
+    }};
+}
+
 impl<'a> Parser<'a> {
     pub fn from(tokens: &Vec<Token>) -> Parser {
-        let mut builtins = HashMap::new();
-
-        builtins.insert(String::from("dist"), BuiltIn::Dist);
-        builtins.insert(String::from("radians"), BuiltIn::Radians);
-        builtins.insert(String::from("pow"), BuiltIn::Pow);
-        builtins.insert(String::from("sin"), BuiltIn::Sin);
+        let builtins = builtins!(
+            ("dist", BuiltIn::Dist),
+            ("radians", BuiltIn::Radians),
+            ("degrees", BuiltIn::Degrees),
+            ("sin", BuiltIn::Sin),
+            ("cos", BuiltIn::Cos),
+            ("tan", BuiltIn::Tan),
+            ("asin", BuiltIn::Asin),
+            ("acos", BuiltIn::Acos),
+            ("atan", BuiltIn::Atan),
+            ("pow", BuiltIn::Pow),
+            ("exp", BuiltIn::Exp),
+            ("log", BuiltIn::Log),
+            ("sqrt", BuiltIn::Sqrt),
+            ("invsqrt", BuiltIn::InverseSqrt),
+            ("abs", BuiltIn::Abs),
+            ("sign", BuiltIn::Sign),
+            ("floor", BuiltIn::Floor),
+            ("ceil", BuiltIn::Ceil),
+            ("fract", BuiltIn::Fract),
+            ("mod", BuiltIn::Mod),
+            ("min", BuiltIn::Min),
+            ("max", BuiltIn::Max),
+            ("clamp", BuiltIn::Clamp),
+            ("mix", BuiltIn::Mix),
+            ("step", BuiltIn::Step),
+            ("length", BuiltIn::Length),
+            ("dot", BuiltIn::Dot),
+            ("cross", BuiltIn::Cross),
+            ("norm", BuiltIn::Norm),
+            ("mat2", BuiltIn::Mat2),
+            ("mat3", BuiltIn::Mat3),
+            ("mat4", BuiltIn::Mat4),
+            ("rotate_x", BuiltIn::RotateX),
+            ("rotate_y", BuiltIn::RotateY),
+            ("rotate_z", BuiltIn::RotateZ),
+            ("rotate", BuiltIn::Rotate),
+            ("scale", BuiltIn::Scale),
+            ("translate", BuiltIn::Translate),
+            ("ortho", BuiltIn::Ortho),
+            ("lookat", BuiltIn::LookAt),
+            ("perspective", BuiltIn::Perspective)
+        );
 
         Parser {
             tokens,
@@ -151,7 +196,7 @@ impl<'a> Parser<'a> {
     }
 
     fn access(&mut self) -> SrcAst {
-        let mut access = self.primary();
+        let mut access = self.index();
 
         if self.match_token(TokenType::Dot) {
             let mut accessors = Vec::new();
@@ -194,6 +239,23 @@ impl<'a> Parser<'a> {
         }
 
         access
+    }
+
+    fn index(&mut self) -> SrcAst {
+        let mut value = self.primary();
+
+        if self.match_token(TokenType::LeftSquare) {
+            let index = self.expression();
+
+            self.consume(TokenType::RightSquare, "Expected ']' when indexing matrix");
+
+            value = SrcAst::new(
+                Ast::MatAccess(Box::new(value), Box::new(index)),
+                self.previous().line,
+            );
+        }
+
+        value
     }
 
     fn comparison(&mut self) -> SrcAst {

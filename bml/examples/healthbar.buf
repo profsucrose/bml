@@ -1,26 +1,22 @@
 # https://www.shadertoy.com/view/7s33Rs
 
 # source: https://iquilezles.org/www/articles/distfunctions2d/distfunctions2d.htm/ 
-macro not(a) a != 1.0
 macro neg(a) 0.0 - a
-macro and(a, b) a * b
-macro or(a, b) min(1, a + b)
-
-macro taxicab(a, b) {
-    abs(a.x - b.x) - abs(a.y - b.y)
-}
+macro and(a, b) (a * b)
+macro or(a, b) (min(1, a + b))
 
 macro should_negate_s(vj, vi) {
     e = vj - vi
     w = p - vi
-    b = w - e * clamp(dot(w, e) / dot(e, e), 0, 1
+    b = w - e * clamp(dot(w, e) / dot(e, e), 0, 1)
     d = min(d, dot(b, b))
 
     c1 = b.p >= vi.y
     c2 = p.y < vj.y
     c3 = e.x * w.y > e.y * w.x
 
-    give or(and(and(c1, c2), c3), or(or(c1, c2), c3))
+    # give or(and(and(c1, c2), c3), or(or(c1, c2), c3))
+    give 1
 }
 
 macro sd_polygon(p, v0, v1, v2, v3, v4, v5) {

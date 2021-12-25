@@ -1,3 +1,4 @@
+use core::panic;
 use lasso::{Rodeo, Spur};
 use std::collections::HashMap;
 
@@ -32,38 +33,41 @@ pub struct Swizzle(
     pub Option<Field>,
 );
 
+// #[derive(PartialEq, Clone, Copy, Debug)]
+// pub enum Vector {
+//     Vec2(f32, f32),
+//     Vec3(f32, f32, f32),
+//     Vec4(f32, f32, f32, f32),
+// }
+
+// #[derive(PartialEq, Clone, Copy, Debug)]
+// pub enum Matrix {
+//     Mat2([Vector; 2]),
+//     Mat3([Vector; 3]),
+//     Mat4([Vector; 4]),
+// }
+
+// #[derive(PartialEq, Clone, Copy, Debug)]
+// pub enum Val {
+//     Float(f32),
+//     Vec(Vector),
+//     Mat(Matrix)
+// }
+
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub enum Val {
     Float(f32),
     Vec2(f32, f32),
     Vec3(f32, f32, f32),
     Vec4(f32, f32, f32, f32),
+
+    // matrices are column-major
+    Mat2([f32; 2], [f32; 2]),
+    Mat3([f32; 3], [f32; 3], [f32; 3]),
+    Mat4([f32; 4], [f32; 4], [f32; 4], [f32; 4])
 }
 
 use Val::*;
-
-/*
-#[derive(PartialEq, Clone, Copy, Debug)]
-pub enum Vector {
-    Float(f32),
-    Vec2(f32, f32),
-    Vec3(f32, f32, f32),
-    Vec4(f32, f32, f32, f32),
-}
-
-#[derive(PartialEq, Clone, Copy, Debug)]
-pub enum Matrix {
-    Mat2(Vector, Vector),
-    Mat3(Vector, Vector, Vector),
-    Mat4(Vector, Vector, Vector, Vector),
-}
-
-#[derive(PartialEq, Clone, Copy, Debug)]
-pub enum Val {
-    Vector,
-    Matrix
-}
-*/
 
 mod math {
     pub fn rad(x: f32) -> f32 {
@@ -101,6 +105,16 @@ impl Val {
             Vec2(x, y) => Vec2(f(x), f(y)),
             Vec3(x, y, z) => Vec3(f(x), f(y), f(z)),
             Vec4(x, y, z, w) => Vec4(f(x), f(y), f(z), f(w)),
+            Mat2(row0, row1) => Mat2(row0.map(|x| f(x)), row1.map(|x| f(x))),
+            Mat3(row0, row1, row2) => {
+                Mat3(row0.map(|x| f(x)), row1.map(|x| f(x)), row2.map(|x| f(x)))
+            }
+            Mat4(row0, row1, row2, row3) => Mat4(
+                row0.map(|x| f(x)),
+                row1.map(|x| f(x)),
+                row2.map(|x| f(x)),
+                row3.map(|x| f(x)),
+            ),
         }
     }
 
@@ -117,7 +131,7 @@ impl Val {
             _ => panic!(
                 "{}",
                 format!(
-                    "expected all args to zipmap3 be same type, got {:?}, {:?}, {:?}",
+                    "expected all args to zipmap3 be vectors of the same type, got {:?}, {:?}, {:?}",
                     self, o1, o2
                 )
             ),
@@ -136,7 +150,8 @@ impl Val {
             (Vec4(lx, ly, lz, lw), Vec4(rx, ry, rz, rw)) => {
                 Vec4(f(lx, rx), f(ly, ry), f(lz, rz), f(lw, rw))
             }
-            _ => panic!("unsupported vector/scalar binary operation relationship"),
+
+            _ => panic!("Unexpected relationship between scalars, vectors or matrices in operation")
         }
     }
 
@@ -148,25 +163,205 @@ impl Val {
                 Vec2(x, _) => x,
                 Vec3(x, _, _) => x,
                 Vec4(x, _, _, _) => x,
+                _ => panic!("Tried to swizzle matrix"),
             },
             Field::Y => match *self {
                 Float(_) => panic!("Float has no y field"),
                 Vec2(_, y) => y,
                 Vec3(_, y, _) => y,
                 Vec4(_, y, _, _) => y,
+                _ => panic!("Tried to swizzle matrix"),
             },
             Field::Z => match *self {
                 Float(_) => panic!("Float has no z field"),
                 Vec2(_, _) => panic!("Vec2 has no z field"),
                 Vec3(_, _, z) => z,
                 Vec4(_, _, z, _) => z,
+                _ => panic!("Tried to swizzle matrix"),
             },
             Field::W => match *self {
                 Float(_) => panic!("Float has no w field"),
                 Vec2(_, _) => panic!("Vec2 has no w field"),
                 Vec3(_, _, _) => panic!("Vec3 has no w field"),
                 Vec4(_, _, _, w) => w,
+                _ => panic!("Tried to swizzle matrix"),
             },
+        }
+    }
+
+    pub fn translate(x: f32, y: f32, z: f32) -> Val {
+        Mat4(
+            [x,   0.0, 0.0, 0.0],
+            [0.0,   y, 0.0, 0.0],
+            [0.0, 0.0,   z, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        )
+    }
+
+    pub fn rotate_x(angle: f32) -> Val {
+        let c = angle.cos();
+        let s = angle.sin();
+
+        Mat4(
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0,   c,   s, 0.0],
+            [0.0,  -s,   c, 0.0],
+            [0.0, 0.0, 0.0, 1.0]
+        )
+    }
+
+    pub fn rotate_y(angle: f32) -> Val {
+        let c = angle.cos();
+        let s = angle.sin();
+
+        Mat4(
+            [  c, 0.0,  -s, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [  s, 0.0,   c, 0.0],
+            [  s, 0.0,   c, 1.0]
+        )
+    }
+
+    pub fn rotate_z(angle: f32) -> Val {
+        let c = angle.cos();
+        let s = angle.sin();
+
+        Mat4(
+            [  c,   s, 0.0, 0.0],
+            [ -s,   c, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0]
+        )
+    }
+
+    pub fn rotate(yaw: f32, pitch: f32, roll: f32) -> Val {
+        Val::rotate_z(yaw).mult(Val::rotate_y(pitch).mult(Val::rotate_x(roll)).unwrap()).unwrap()
+    }
+
+    pub fn scale(s: f32) -> Val {
+        Mat4(
+            [  s, 0.0, 0.0, 0.0],
+            [0.0,   s, 0.0, 0.0],
+            [0.0, 0.0,   s, 0.0],
+            [0.0, 0.0, 0.0,   s]
+        )
+    }
+
+    pub fn ortho(near: f32, far: f32, left: f32, right: f32, top: f32, bottom: f32) -> Val {
+        Mat4(
+            [ 2.0 / (right - left),                 0.0,                0.0, -(right + left) / (right - left) ],
+            [                  0.0, 2.0 / (top - bottom),               0.0, -(top + bottom) / (top - bottom) ],
+            [                  0.0,                  0.0, -2.0/(far - near),     -(far + near) / (far - near) ],
+            [                  0.0,                  0.0,               0.0,                             1.0 ]
+        )
+    }
+
+    pub fn perspective(fov: f32, near: f32, far: f32) -> Val {
+        let s = 1.0 / (fov / 2.0 * std::f32::consts::PI / 180.0);
+
+        Mat4(
+            [s, 0.0, 0.0, 0.0],
+            [0.0, s, 0.0, 0.0],
+            [0.0, 0.0, -far / (far - near), -1.0],
+            [0.0, 0.0, -(far * near) / (far - near), 0.0]
+        )
+    }
+
+    pub fn lookat(from: Val, to: Val) -> Val {
+        let up = Vec3(0.0, 1.0, 0.0);
+        let forward = from.zipmap(to, |l, r| l -r).norm();
+        let right = up.norm().cross(forward).unwrap();
+
+        // center row is up-axis Vec3(0, 1, 0)
+
+        Mat4(
+            [right.get_field(Field::X), 0.0, forward.get_field(Field::X), from.get_field(Field::X)],
+            [right.get_field(Field::Y), 1.0, forward.get_field(Field::Y), from.get_field(Field::Y)],
+            [right.get_field(Field::Z), 0.0, forward.get_field(Field::Z), from.get_field(Field::Z)],
+            [                      0.0, 0.0,                         0.0,                      1.0]
+        )
+    }
+
+    pub fn mult(&self, o: Self) -> Result<Val, String> {
+        match (*self, o) {
+            (Float(_), Float(_))
+                | (Vec2(_, _), Vec2(_, _))
+                | (Vec3(_, _, _), Vec3(_, _, _))
+                | (Vec4(_, _, _, _), Vec4(_, _, _, _))
+            => Ok(self.zipmap(o, |x, y| x * y)),
+
+            (Float(a), Vec2(_, _))
+                | (Float(a), Vec3(_, _, _))
+                | (Float(a), Vec4(_, _, _, _))
+            => Ok(o.map(|x| a * x)),
+
+            (Float(x), Mat2(col0, col1)) => Ok(Mat2([col0[0] * x, col0[1] * x], [col1[0] * x, col1[1] * x])),
+            (Float(x), Mat3(col0, col1, col2)) => Ok(Mat3([col0[0] * x, col0[1] * x, col0[2] * x], [col1[0] * x, col1[1] * x, col1[2] * x], [col2[0] * x, col2[1] * x, col2[2] * x])),
+            (Float(x), Mat4(col0, col1, col2, col3)) => Ok(Mat4([col0[0] * x, col0[1] * x, col0[2] * x, col0[3] * x], [col1[0] * x, col1[1] * x, col1[2] * x, col1[3] * x], [col2[0] * x, col2[1] * x, col2[2] * x, col2[3] * x], [col3[0] * x, col3[1] * x, col3[2] * x, col3[3] * x])),
+            
+            (Vec2(x, y), Mat2(col0, col1)) => Ok(Vec2(x * col0[0] + y * col0[0], x * col1[0] + y * col1[0])),
+            (Vec3(x, y, z), Mat3(col0, col1, col2)) => Ok(Vec3(x * col0[0] + y * col0[1] + z * col0[2], x * col1[0] + y * col1[1] + z * col1[2], x * col2[0] + y * col2[1] + z * col2[2])), 
+            (Vec4(x, y, z, w), Mat4(col0, col1, col2, col3)) => Ok(Vec4(x * col0[0] + y * col0[1] + z * col0[2] + w * col0[3], x * col1[0] + y * col1[1] + z * col1[2] + w * col1[3], x * col2[0] + y * col2[1] + z * col2[2] + w * col2[3], x * col3[0] + y * col3[1] + z * col3[2] + w * col3[3])),
+            
+            (Mat2(col0, col1), Vec2(x, y)) => Ok(Vec2(col0[0] * x + col1[0] * y, col0[1] * x + col1[1] * y)),
+            (Mat3(col0, col1, col2), Vec3(x, y, z)) => Ok(Vec3(col0[0] * x + col1[0] * y + col2[0] * z, col0[1] * x + col1[1] * y + col2[1] * z, col0[2] * x + col1[2] * y + col2[2] * z)),
+            (Mat4(col0, col1, col2, col3), Vec4(x, y, z, w)) => Ok(Vec4(col0[0] * x + col1[0] * y + col2[0] * z + col3[0] * w, col0[1] * x + col1[1] * y + col2[1] * z + col3[1] * w, col0[2] * x + col1[2] * y + col2[2] * z + col3[2] * w, col0[3] * x + col1[3] * y + col2[3] * z + col3[3] * w)),
+
+            (Mat2(a0, a1), Mat2(b0, b1)) => Ok(
+                Mat2(
+                    [a0[0] * b0[0] + a1[0] * b0[1], a0[1] * b0[0] + a1[1] * b0[1]],
+                    [a0[0] * b1[0] + a1[0] * b1[1], a0[1] * b1[0] + a1[1] * b1[1]]
+                )
+            ),
+
+            (Mat3(a0, a1, a2), Mat3(b0, b1, b2)) => Ok(
+                Mat3(
+                    [a0[0] * b0[0] + a1[0] * b0[1] + a2[0] * b0[2], a0[1] * b0[0] + a1[1] * b0[1] + a2[1] * b0[2], a0[2] * b0[0] + a1[2] * b0[1] + a2[2] * b0[2]],
+                    [a0[0] * b1[0] + a1[0] * b1[1] + a2[0] * b1[2], a0[1] * b1[0] + a1[1] * b1[1] + a2[1] * b1[2], a0[2] * b1[0] + a1[2] * b1[1] + a2[2] * b1[2]],
+                    [a0[0] * b2[0] + a1[0] * b2[1] + a2[0] * b2[2], a0[1] * b2[0] + a1[1] * b2[1] + a2[1] * b2[2], a0[2] * b2[0] + a1[2] * b2[1] + a2[2] * b2[2]]
+                )
+            ),
+
+            (Mat4(a0, a1, a2, a3), Mat4(b0, b1, b2, b3)) => Ok(
+                Mat4(
+                    [a0[0] * b0[0] + a1[0] * b0[1] + a2[0] * b0[2] + a3[0] * b0[3], a0[1] * b0[0] + a1[1] * b0[1] + a2[1] * b0[2] + a3[1] * b0[3], a0[2] * b0[0] + a1[2] * b0[1] + a2[2] * b0[2] + a3[2] * b0[3], a0[3] * b0[0] + a1[3] * b0[1] + a2[3] * b0[2] + a3[3] * b0[3]],
+                    [a0[0] * b1[0] + a1[0] * b1[1] + a2[0] * b1[2] + a3[0] * b1[3], a0[1] * b1[0] + a1[1] * b1[1] + a2[1] * b1[2] + a3[1] * b1[3], a0[2] * b1[0] + a1[2] * b1[1] + a2[2] * b1[2] + a3[2] * b1[3], a0[3] * b1[0] + a1[3] * b1[1] + a2[3] * b1[2] + a3[3] * b1[3]],
+                    [a0[0] * b2[0] + a1[0] * b2[1] + a2[0] * b2[2] + a3[0] * b2[3], a0[1] * b2[0] + a1[1] * b2[1] + a2[1] * b2[2] + a3[1] * b2[3], a0[2] * b2[0] + a1[2] * b2[1] + a2[2] * b2[2] + a3[2] * b2[3], a0[3] * b2[0] + a1[3] * b2[1] + a2[3] * b2[2] + a3[3] * b2[3]],
+                    [a0[0] * b3[0] + a1[0] * b3[1] + a2[0] * b3[2] + a3[0] * b3[3], a0[1] * b3[0] + a1[1] * b3[1] + a2[1] * b3[2] + a3[1] * b3[3], a0[2] * b3[0] + a1[2] * b3[1] + a2[2] * b3[2] + a3[2] * b3[3], a0[3] * b3[0] + a1[3] * b3[1] + a2[3] * b3[2] + a3[3] * b3[3]]
+                )
+            ),
+
+            _ => Err(format!("Expected vecX * vecX, vecX * matX, matX * vecX, float * vecX, or float * matX, got {:?} * {:?}", self, o))
+        }
+    }
+
+    pub fn index_matrix(&self, f: usize) -> Result<Val, String> {
+        match (self, f) {
+            (&Mat2(col0, _), 0) => Ok(Vec2(col0[0], col0[1])),
+            (&Mat2(_, col1), 1) => Ok(Vec2(col1[0], col1[1])),
+            (&Mat2(_, _), index) => Err(format!(
+                "Expected 0 <= index <= 1 when accessing mat2, got {}",
+                index
+            )),
+
+            (&Mat3(col0, _, _), 0) => Ok(Vec3(col0[0], col0[1], col0[2])),
+            (&Mat3(_, col1, _), 1) => Ok(Vec3(col1[0], col1[1], col1[2])),
+            (&Mat3(_, _, col2), 2) => Ok(Vec3(col2[0], col2[1], col2[2])),
+            (&Mat3(_, _, _), index) => Err(format!(
+                "Expected 0 <= index <= 2, when accessing mat3, got {}",
+                index
+            )),
+
+            (&Mat4(col0, _, _, _), 0) => Ok(Vec4(col0[0], col0[1], col0[2], col0[3])),
+            (&Mat4(_, col1, _, _), 1) => Ok(Vec4(col1[0], col1[1], col1[2], col1[3])),
+            (&Mat4(_, _, col2, _), 2) => Ok(Vec4(col2[0], col2[1], col2[2], col2[3])),
+            (&Mat4(_, _, _, col3), 3) => Ok(Vec4(col3[0], col3[1], col3[2], col3[3])),
+            (&Mat4(_, _, _, _), index) => Err(format!(
+                "Expected 0 <= index <= 3, when accessing mat4, got {}",
+                index
+            )),
+
+            (accessor, _) => Err(format!("Expected matrix when indexing, got {:?}", accessor)),
         }
     }
 
@@ -222,7 +417,7 @@ impl Val {
         self.map(f32::fract)
     }
 
-    pub fn pow(&self, exp: Val) -> Result<Val, String> {
+    pub fn pow(&self, exp: Self) -> Result<Val, String> {
         match (self, exp) {
             (Float(_), Float(_))
                 | (Vec2(_, _), Vec2(_, _))
@@ -264,24 +459,24 @@ impl Val {
         }
     }
 
-    pub fn min(&self, val: &Val) -> Result<Val, String> {
+    pub fn min(&self, val: Self) -> Result<Val, String> {
         match (self, val) {
             (Float(_), Float(_))
                 | (Vec2(_, _), Vec2(_, _))
                 | (Vec3(_, _, _), Vec3(_, _, _))
                 | (Vec4(_, _, _, _), Vec4(_, _, _, _))
-            => Ok(self.zipmap(*val, |x, y| x.min(y))),
+            => Ok(self.zipmap(val, |x, y| x.min(y))),
             _ => Err(format!("Expected min(float, float), min(vec2, vec2), min(vec3, vec3), min(vec4, vec4), got min({:?}, {:?})", self, val))
         }
     }
 
-    pub fn max(&self, val: &Val) -> Result<Val, String> {
+    pub fn max(&self, val: Self) -> Result<Val, String> {
         match (self, val) {
             (Float(_), Float(_))
                 | (Vec2(_, _), Vec2(_, _))
                 | (Vec3(_, _, _), Vec3(_, _, _))
                 | (Vec4(_, _, _, _), Vec4(_, _, _, _))
-            => Ok(self.zipmap(*val, |x, y| x.max(y))),
+            => Ok(self.zipmap(val, |x, y| x.max(y))),
             _ => Err(format!("Expected max(float, float), max(vec2, vec2), max(vec3, vec3), max(vec4, vec4), got max({:?}, {:?})", self, val))
         }
     }
@@ -343,6 +538,8 @@ impl Val {
             Vec2(x, y) => x + y,
             Vec3(x, y, z) => x + y + z,
             Vec4(x, y, z, w) => x + y + z + w,
+
+            _ => panic!("Tried to get length of matrix"),
         };
 
         Float(sum.sqrt())
@@ -380,9 +577,7 @@ impl Val {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BuiltIn {
-    Mat2,
-    Mat3,
-    Mat4,
+    // vector utilities
     Dist,
     Radians,
     Degrees,
@@ -408,11 +603,24 @@ pub enum BuiltIn {
     Clamp,
     Mix,
     Step,
-    SmoothStep,
     Length,
     Dot,
     Cross,
     Norm,
+
+    // matrix utilities
+    Mat2,
+    Mat3,
+    Mat4,
+    RotateX,
+    RotateY,
+    RotateZ,
+    Rotate,
+    Scale,
+    Translate,
+    Ortho,
+    LookAt,
+    Perspective
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -428,6 +636,7 @@ pub enum Ast {
     ),
     VecRepeated(Box<SrcAst>, Box<SrcAst>),
     VecAccess(Box<SrcAst>, Swizzle),
+    MatAccess(Box<SrcAst>, Box<SrcAst>),
     Ident(Spur),
     Return(Box<SrcAst>),
     Give(Box<SrcAst>),
@@ -464,6 +673,7 @@ impl SrcAst {
                 }
                 VecRepeated(l, n) => VecRepeated(bmap(l), bmap(n)),
                 VecAccess(v, s) => VecAccess(bmap(v), s),
+                MatAccess(v, f) => MatAccess(bmap(v), bmap(f)),
                 Ident(s) => Ident(s),
                 Return(expr) => Return(bmap(expr)),
                 Give(expr) => Give(bmap(expr)),
@@ -590,6 +800,7 @@ pub fn is_const(SrcAst { ast, .. }: &SrcAst) -> bool {
         }
         VecRepeated(l, n) => is_const(l) && is_const(n),
         VecAccess(v, _) => is_const(v),
+        MatAccess(v, x) => is_const(v) && is_const(x),
         Ident(_) => false,
         Return(_) => false,
         BinOp(lhs, _, rhs) => is_const(lhs) && is_const(rhs),
@@ -642,6 +853,61 @@ pub fn fold(SrcAst { ast, .. }: &SrcAst) -> Option<Val> {
                    },
                    Call(BuiltIn, Vec<SrcAst>), */
     }
+}
+
+macro_rules! builtin_one_arg {
+    ($op:path, $function:expr, $len:ident, $line:ident, $vals:ident, $env:ident) => {{
+        if $len != 1 {
+            report(
+                ErrorType::Runtime,
+                $line,
+                format!("Expected 1 input to {}(a), got {}", $function, $len).as_str(),
+            )
+        }
+
+        EvalRet::new($env).with_val(Some($op(&$vals.pop().unwrap())))
+    }};
+}
+
+macro_rules! builtin_two_args {
+    ($op:path, $function:expr, $len:ident, $line:ident, $vals:ident, $env:ident) => {{
+        if $len != 2 {
+            report(
+                ErrorType::Runtime,
+                $line,
+                format!("Expected 2 inputs to {}(a, b), got {}", $function, $len).as_str(),
+            )
+        }
+
+        let arg2 = $vals.pop().unwrap();
+        let arg1 = $vals.pop().unwrap();
+
+        EvalRet::new($env).with_val(Some(match $op(&arg1, arg2) {
+            Ok(result) => result,
+            Err(error) => report(ErrorType::Runtime, $line, error.as_str()),
+        }))
+    }};
+}
+
+macro_rules! builtin_three_args {
+    ($op:path, $function:expr, $len:ident, $line:ident, $vals:ident, $env:ident) => {{
+        if $len != 3 {
+            report(
+                ErrorType::Runtime,
+                $line,
+                format!("Expected 3 inputs to {}(a, b, c), got {}", $function, $len).as_str(),
+            )
+        }
+
+        let arg3 = $vals.pop().unwrap();
+        let arg2 = $vals.pop().unwrap();
+        let arg1 = $vals.pop().unwrap();
+
+        EvalRet::new($env).with_val(Some(match $op(&arg1, arg2, arg3) {
+            Ok(result) => result,
+            Err(error) => report(ErrorType::Runtime, $line, error.as_str()),
+        }))
+    }};
 }
 
 pub fn eval(&SrcAst { line, ref ast }: &SrcAst, e: Env, r: &Rodeo) -> EvalRet {
@@ -717,6 +983,36 @@ pub fn eval(&SrcAst { line, ref ast }: &SrcAst, e: Env, r: &Rodeo) -> EvalRet {
                 _ => panic!(),
             }
         }
+        MatAccess(mat, row) => {
+            let ERVal { env, val: matrix } = eval(mat, e, r).needs_val();
+            let ERVal { env, val: access } = eval(row, env, r).needs_val();
+
+            let access = if let Float(access) = access {
+                access
+            } else {
+                report(
+                    ErrorType::Runtime,
+                    line,
+                    format!("Expected float when indexing matrix, got {:?}", access).as_str(),
+                )
+            };
+
+            let row = match matrix {
+                Mat2(_, _) => matrix.index_matrix(access as usize),
+                Mat3(_, _, _) => matrix.index_matrix(access as usize),
+                Mat4(_, _, _, _) => matrix.index_matrix(access as usize),
+                _ => report(
+                    ErrorType::Runtime,
+                    line,
+                    format!("Expected matrix when indexing, got {:?}", matrix).as_str(),
+                ),
+            };
+
+            match row {
+                Ok(row) => return EvalRet::new(env).with_val(Some(row)),
+                Err(error) => report(ErrorType::Runtime, line, error.as_str()),
+            }
+        }
         VecAccess(access_me, swiz) => {
             let ERVal { env, val } = eval(&access_me, e, r).needs_val();
 
@@ -778,12 +1074,16 @@ pub fn eval(&SrcAst { line, ref ast }: &SrcAst, e: Env, r: &Rodeo) -> EvalRet {
                 }
                 (_, Op::Sub, _) => lval.zipmap(rval, |l, r| l - r),
                 (_, Op::Add, _) => lval.zipmap(rval, |l, r| l + r),
-                (_, Op::Mul, _) => lval.zipmap(rval, |l, r| l * r),
+                (_, Op::Mul, _) => match lval.mult(rval) {
+                    Ok(result) => result,
+                    Err(error) => report(ErrorType::Runtime, line, error.as_str())
+                }
                 (_, Op::Div, _) => lval.zipmap(rval, |l, r| l / r),
                 (Float(l), Op::More, Float(r)) => Float((l > r) as i32 as f32),
                 (Float(l), Op::Less, Float(r)) => Float((l < r) as i32 as f32),
-                (Float(l), Op::MoreEq, Float(r)) => Float((l <= r) as i32 as f32),
-                (Float(l), Op::LessEq, Float(r)) => Float((l >= r) as i32 as f32),
+                (Float(l), Op::MoreEq, Float(r)) => Float((l >= r) as i32 as f32),
+                (Float(l), Op::LessEq, Float(r)) => Float((l <= r) as i32 as f32),
+                (Float(l), Op::Equal, Float(r)) => Float(if l == r { 1.0 } else { 0.0 }),
                 _ => report(
                     ErrorType::Runtime,
                     line,
@@ -822,91 +1122,284 @@ pub fn eval(&SrcAst { line, ref ast }: &SrcAst, e: Env, r: &Rodeo) -> EvalRet {
                     });
 
             match *builtin {
-                BuiltIn::Mat2 => todo!(),
-                // BuiltIn::Mat2 => {
-                //     if len != 2 {
-                //         report(ErrorType::Runtime, line, format!("Expected 2 inputs to mat2(vec2, vec2), got {}", len).as_str());
-                //     }
-
-                //     let mat = match (vals.pop(), vals.pop()) {
-                //         (Vec2(x0, y0), Vec2(x1, y1)) => Mat2(Vec2(x0, y0), Vec2(x1, y1)),
-                //         (x, y) => report(ErrorType::Runtime, line, format!("Expected mat2(vec2, vec2), got mat2({:?}, {:?})", x, y).as_str())
-                //     };
-
-                //     EvalRet::new(env).with_val(Some(mat))
-                // },
-                BuiltIn::Mat3 => todo!(),
-                BuiltIn::Mat4 => todo!(),
-                BuiltIn::Dist => {
+                BuiltIn::Mat2 => {
                     if len != 2 {
                         report(
                             ErrorType::Runtime,
                             line,
-                            format!("Expected 2 inputs to dist(a, b), got {}", len).as_str(),
-                        )
+                            format!("Expected 2 inputs to mat2(vec2, vec2), got {}", len).as_str(),
+                        );
                     }
 
-                    let distance = match vals.pop().unwrap().dist(vals.pop().unwrap()) {
-                        Ok(distance) => distance,
-                        Err(error) => report(ErrorType::Runtime, line, error.as_str()),
+                    let arg2 = vals.pop().unwrap();
+                    let arg1 = vals.pop().unwrap();
+
+                    let mat = match (arg1, arg2) {
+                        (Vec2(x0, y0), Vec2(x1, y1)) => Mat2([x0, y0], [x1, y1]),
+                        (x, y) => report(
+                            ErrorType::Runtime,
+                            line,
+                            format!("Expected mat2(vec2, vec2), got mat2({:?}, {:?})", x, y)
+                                .as_str(),
+                        ),
                     };
 
-                    EvalRet::new(env).with_val(Some(distance))
+                    EvalRet::new(env).with_val(Some(mat))
                 }
-                BuiltIn::Sin => {
-                    if len != 1 {
+                BuiltIn::Mat3 => {
+                    if len != 3 {
                         report(
                             ErrorType::Runtime,
                             line,
-                            format!("Expected 1 input to sin(a), got {}", len).as_str(),
-                        )
+                            format!("Expected 3 inputs to mat3(vec3, vec3, vec3), got {}", len)
+                                .as_str(),
+                        );
                     }
 
-                    EvalRet::new(env).with_val(Some(vals.pop().unwrap().sin()))
+                    let arg3 = vals.pop().unwrap();
+                    let arg2 = vals.pop().unwrap();
+                    let arg1 = vals.pop().unwrap();
+
+                    let mat = match (arg1, arg2, arg3) {
+                        (Vec3(x0, y0, z0), Vec3(x1, y1, z1), Vec3(x2, y2, z2)) => {
+                            Mat3([x0, y0, z0], [x1, y1, z1], [x2, y2, z2])
+                        }
+                        (x, y, z) => report(
+                            ErrorType::Runtime,
+                            line,
+                            format!(
+                                "Expected mat3(vec3, vec3, vec3), got mat3({:?}, {:?}, {:?})",
+                                x, y, z
+                            )
+                            .as_str(),
+                        ),
+                    };
+
+                    EvalRet::new(env).with_val(Some(mat))
+                }
+                BuiltIn::Mat4 => {
+                    if len != 4 {
+                        report(
+                            ErrorType::Runtime,
+                            line,
+                            format!(
+                                "Expected 4 inputs to mat4(vec4, vec4, vec4, vec4), got {}",
+                                len
+                            )
+                            .as_str(),
+                        );
+                    }
+
+                    let arg4 = vals.pop().unwrap();
+                    let arg3 = vals.pop().unwrap();
+                    let arg2 = vals.pop().unwrap();
+                    let arg1 = vals.pop().unwrap();
+
+                    let mat = match (arg1, arg2, arg3, arg4) {
+                        (Vec4(x0, y0, z0, w0), Vec4(x1, y1, z1, w1), Vec4(x2, y2, z2, w2), Vec4(x3, y3, z3, w3)) => Mat4([x0, y0, z0, w0], [x1, y1, z1, w1], [x2, y2, z2, w2], [x3, y3, z3, w3]),
+                        (x, y, z, w) => report(ErrorType::Runtime, line, format!("Expected mat4(vec4, vec4, vec4, vec4), got mat4({:?}, {:?}, {:?}, {:?})", x, y, z, w).as_str())
+                    };
+
+                    EvalRet::new(env).with_val(Some(mat))
+                }
+                BuiltIn::Dist => {
+                    builtin_two_args!(Val::dist, "dist", len, line, vals, env)
                 }
                 BuiltIn::Pow => {
-                    if len != 2 {
-                        report(
-                            ErrorType::Runtime,
-                            line,
-                            format!("Expected 2 inputs to pow(a, b), got {}", len).as_str(),
-                        )
+                    builtin_two_args!(Val::pow, "pow", len, line, vals, env)
+                }
+                BuiltIn::Sin => {
+                    builtin_one_arg!(Val::sin, "sin", len, line, vals, env)
+                }
+                BuiltIn::Cos => {
+                    builtin_one_arg!(Val::cos, "cos", len, line, vals, env)
+                }
+                BuiltIn::Tan => {
+                    builtin_one_arg!(Val::tan, "tan", len, line, vals, env)
+                }
+                BuiltIn::Asin => {
+                    builtin_one_arg!(Val::asin, "asin", len, line, vals, env)
+                }
+                BuiltIn::Acos => {
+                    builtin_one_arg!(Val::acos, "acos", len, line, vals, env)
+                }
+                BuiltIn::Atan => {
+                    builtin_one_arg!(Val::atan, "atan", len, line, vals, env)
+                }
+                BuiltIn::Exp => {
+                    builtin_one_arg!(Val::exp, "exp", len, line, vals, env)
+                }
+                BuiltIn::Log => {
+                    builtin_one_arg!(Val::log, "log", len, line, vals, env)
+                }
+                BuiltIn::Sqrt => {
+                    builtin_one_arg!(Val::sqrt, "sqrt", len, line, vals, env)
+                }
+                BuiltIn::InverseSqrt => {
+                    builtin_one_arg!(Val::invsqrt, "invsqrt", len, line, vals, env)
+                }
+                BuiltIn::Abs => {
+                    builtin_one_arg!(Val::abs, "abs", len, line, vals, env)
+                }
+                BuiltIn::Sign => {
+                    builtin_one_arg!(Val::sign, "sign", len, line, vals, env)
+                }
+                BuiltIn::Floor => {
+                    builtin_one_arg!(Val::floor, "floor", len, line, vals, env)
+                }
+                BuiltIn::Ceil => {
+                    builtin_one_arg!(Val::ceil, "ceil", len, line, vals, env)
+                }
+                BuiltIn::Fract => {
+                    builtin_one_arg!(Val::fract, "fract", len, line, vals, env)
+                }
+                BuiltIn::Mod => {
+                    builtin_two_args!(Val::modulo, "mod", len, line, vals, env)
+                }
+                BuiltIn::Min => {
+                    builtin_two_args!(Val::min, "min", len, line, vals, env)
+                }
+                BuiltIn::Max => {
+                    builtin_two_args!(Val::max, "max", len, line, vals, env)
+                }
+                BuiltIn::Clamp => {
+                    builtin_three_args!(Val::clamp, "clamp", len, line, vals, env)
+                }
+                BuiltIn::Mix => {
+                    builtin_three_args!(Val::mix, "mix", len, line, vals, env)
+                }
+                BuiltIn::Step => {
+                    builtin_two_args!(Val::step, "step", len, line, vals, env)
+                }
+                BuiltIn::Length => {
+                    builtin_one_arg!(Val::length, "length", len, line, vals, env)
+                }
+                BuiltIn::Dot => {
+                    builtin_two_args!(Val::dot, "dot", len, line, vals, env)
+                }
+                BuiltIn::Cross => {
+                    builtin_two_args!(Val::cross, "cross", len, line, vals, env)
+                }
+                BuiltIn::Norm => {
+                    builtin_one_arg!(Val::norm, "norm", len, line, vals, env)
+                }
+                BuiltIn::Radians => {
+                    builtin_one_arg!(Val::radians, "radians", len, line, vals, env)
+                }
+                BuiltIn::Degrees => {
+                    builtin_one_arg!(Val::degrees, "degrees", len, line, vals, env)
+                }
+                BuiltIn::RotateX => {
+                    if len != 1 {
+                        report(ErrorType::Runtime, line, format!("Expected 1 input to rotate_x(a), got {}", len).as_str());
                     }
 
-                    let pow = match vals.pop().unwrap().dist(vals.pop().unwrap()) {
-                        Ok(distance) => distance,
-                        Err(error) => report(ErrorType::Runtime, line, error.as_str()),
-                    };
-
-                    EvalRet::new(env).with_val(Some(pow))
+                    match vals.pop().unwrap() {
+                        Float(radians) => EvalRet::new(env).with_val(Some(Val::rotate_x(radians))),
+                        x => report(ErrorType::Runtime, line, format!("Expected rotate_x(float), got rotate_x({:?})", x).as_str())
+                    }
                 }
-                BuiltIn::Cos => todo!(),
-                BuiltIn::Tan => todo!(),
-                BuiltIn::Asin => todo!(),
-                BuiltIn::Acos => todo!(),
-                BuiltIn::Atan => todo!(),
-                BuiltIn::Exp => todo!(),
-                BuiltIn::Log => todo!(),
-                BuiltIn::Sqrt => todo!(),
-                BuiltIn::InverseSqrt => todo!(),
-                BuiltIn::Abs => todo!(),
-                BuiltIn::Sign => todo!(),
-                BuiltIn::Floor => todo!(),
-                BuiltIn::Ceil => todo!(),
-                BuiltIn::Fract => todo!(),
-                BuiltIn::Mod => todo!(),
-                BuiltIn::Min => todo!(),
-                BuiltIn::Max => todo!(),
-                BuiltIn::Clamp => todo!(),
-                BuiltIn::Mix => todo!(),
-                BuiltIn::Step => todo!(),
-                BuiltIn::SmoothStep => todo!(),
-                BuiltIn::Length => todo!(),
-                BuiltIn::Dot => todo!(),
-                BuiltIn::Cross => todo!(),
-                BuiltIn::Norm => todo!(),
-                BuiltIn::Radians => todo!(),
-                BuiltIn::Degrees => todo!(),
+                BuiltIn::RotateY => {
+                    if len != 1 {
+                        report(ErrorType::Runtime, line, format!("Expected 1 input to rotate_y(a), got {}", len).as_str());
+                    }
+
+                    match vals.pop().unwrap() {
+                        Float(radians) => EvalRet::new(env).with_val(Some(Val::rotate_y(radians))),
+                        x => report(ErrorType::Runtime, line, format!("Expected rotate_y(float), got rotate_y({:?})", x).as_str())
+                    }
+                },
+                BuiltIn::RotateZ => {
+                    if len != 1 {
+                        report(ErrorType::Runtime, line, format!("Expected 1 input to rotate_z(a), got {}", len).as_str());
+                    }
+
+                    match vals.pop().unwrap() {
+                        Float(radians) => EvalRet::new(env).with_val(Some(Val::rotate_z(radians))),
+                        x => report(ErrorType::Runtime, line, format!("Expected rotate_z(float), got rotate_z({:?})", x).as_str())
+                    }
+                },
+                BuiltIn::Rotate => {
+                    if len != 3 {
+                        report(ErrorType::Runtime, line, format!("Expected 3 inputs to rotate(a, b, c), got {}", len).as_str());
+                    }
+
+                    let arg3 = vals.pop().unwrap();
+                    let arg2 = vals.pop().unwrap();
+                    let arg1 = vals.pop().unwrap();
+
+                    match (arg1, arg2, arg3) {
+                        (Float(yaw), Float(pitch), Float(roll)) => EvalRet::new(env).with_val(Some(Val::rotate(yaw, pitch, roll))),
+                        (x, y, z) => report(ErrorType::Runtime, line, format!("Expected rotate(float, float, float), got rotate({:?}, {:?}, {:?})", x, y, z).as_str())
+                    }
+                },
+                BuiltIn::Scale => {
+                    if len != 1 {
+                        report(ErrorType::Runtime, line, format!("Expected 1 input to scale(a), got {}", len).as_str());
+                    }
+
+                    match vals.pop().unwrap() {
+                        Float(s) => EvalRet::new(env).with_val(Some(Val::scale(s))),
+                        x => report(ErrorType::Runtime, line, format!("Expected scale(float), got scale({:?})", x).as_str())
+                    }
+                }
+                BuiltIn::Translate => {
+                    if len != 3 {
+                        report(ErrorType::Runtime, line, format!("Expected 3 inputs to translate(a, b, c), got {}", len).as_str());
+                    }
+
+                    let arg3 = vals.pop().unwrap();
+                    let arg2 = vals.pop().unwrap();
+                    let arg1 = vals.pop().unwrap();
+
+                    match (arg1, arg2, arg3) {
+                        (Float(x), Float(y), Float(z)) => EvalRet::new(env).with_val(Some(Val::translate(x, y, z))),
+                        (x, y, z) => report(ErrorType::Runtime, line, format!("Expected translate(float, float, float), got translate({:?}, {:?}, {:?})", x, y, z).as_str())
+                    }
+                },
+                BuiltIn::Ortho => {
+                    if len != 6 {
+                        report(ErrorType::Runtime, line, format!("Expected 6 inputs to ortho(a, b, c, d, e, f), got {}", len).as_str());
+                    }
+
+                    let arg6 = vals.pop().unwrap();
+                    let arg5 = vals.pop().unwrap();
+                    let arg4 = vals.pop().unwrap();
+                    let arg3 = vals.pop().unwrap();
+                    let arg2 = vals.pop().unwrap();
+                    let arg1 = vals.pop().unwrap();
+
+                    match (arg1, arg2, arg3, arg4, arg5, arg6) {
+                        (Float(near), Float(far), Float(left), Float(right), Float(top), Float(bottom)) => EvalRet::new(env).with_val(Some(Val::ortho(near, far, left, right, top, bottom))),
+                        (x, y, z, w, v, u) => report(ErrorType::Runtime, line, format!("Expected ortho(float, float, float, float, float, float), got ortho({:?}, {:?}, {:?}, {:?}, {:?}, {:?})", x, y, z, w, v, u).as_str())
+                    }
+                }
+                BuiltIn::LookAt => {
+                    if len != 2 {
+                        report(ErrorType::Runtime, line, format!("Expected 2 inputs to lookat(a, b), got {}", len).as_str());
+                    }
+
+                    let arg2 = vals.pop().unwrap();
+                    let arg1 = vals.pop().unwrap();
+    
+                    match (arg1, arg2) {
+                        (Vec3(_, _, _), Vec3(_, _, _)) => EvalRet::new(env).with_val(Some(Val::lookat(arg1, arg2))),
+                        (x, y) => report(ErrorType::Runtime, line, format!("Expected lookat(vec3, vec3), got lookat({:?}, {:?})", x, y).as_str())
+                    }
+                }
+                BuiltIn::Perspective => {
+                    if len != 2 {
+                        report(ErrorType::Runtime, line, format!("Expected 2 inputs to lookat(a, b), got {}", len).as_str());
+                    }
+
+                    let arg2 = vals.pop().unwrap();
+                    let arg1 = vals.pop().unwrap();
+    
+                    match (arg1, arg2) {
+                        (Vec3(_, _, _), Vec3(_, _, _)) => EvalRet::new(env).with_val(Some(Val::lookat(arg1, arg2))),
+                        (x, y) => report(ErrorType::Runtime, line, format!("Expected lookat(vec3, vec3), got lookat({:?}, {:?})", x, y).as_str())
+                    }
+                }
             }
         }
     }

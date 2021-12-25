@@ -1,18 +1,18 @@
 use std::process;
 
-use ast::Val;
-use bml::ast::{self, eval};
+use bml::ast::{self, Val};
+use bml::logger::{report, ErrorType};
 use image::io::Reader as ImageReader;
 
 macro_rules! gen_runtime_idents {
-  ($($x:ident $(,)? )*) => {
-    struct RuntimeIdents { $($x: lasso::Spur,)* }
-    impl RuntimeIdents {
-      fn new(rodeo: &mut lasso::Rodeo<lasso::Spur>) -> Self {
-        Self { $($x: rodeo.get_or_intern(stringify!($x)), )* }
-      }
-    }
-  }
+    ($($x:ident $(,)? )*) => {
+        struct RuntimeIdents { $($x: lasso::Spur,)* }
+            impl RuntimeIdents {
+                fn new(rodeo: &mut lasso::Rodeo<lasso::Spur>) -> Self {
+                    Self { $($x: rodeo.get_or_intern(stringify!($x)), )* }
+                }
+            }
+        }
 }
 
 gen_runtime_idents!(resolution, coord, frag, frame, frame_count);
@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if let Some(flag) = eval_flag {
         if flag == "--eval" {
-            let output = eval(&ast, env, &rodeo).env.ret.take();
+            let output = ast::eval(&ast, env, &rodeo).env.ret.take();
 
             println!("return={:?}", output);
 
@@ -95,8 +95,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         frame.push((255.0 * z) as u8);
                         frame.push((255.0 * w) as u8);
                     }
-                    None => panic!("scripts must return new pixel color"),
-                    Some(_) => panic!("pixel colors returned must be 4 dimensional"),
+                    None => report(
+                        ErrorType::Runtime,
+                        ast.line,
+                        "Expected program to return vec4, got nothing",
+                    ),
+                    Some(val) => report(
+                        ErrorType::Runtime,
+                        ast.line,
+                        format!("Returned color must be vec4, got {:?}", val).as_str(),
+                    ),
                 };
                 ret.env
             });

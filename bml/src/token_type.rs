@@ -37,6 +37,7 @@ pub enum TokenType {
     Give,
     Macro,
     Repeat,
+    While,
 
     // literals
     Number,

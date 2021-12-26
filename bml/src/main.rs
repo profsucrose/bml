@@ -85,6 +85,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (mut rodeo, ast) = bml::string_to_ast(std::fs::read_to_string(&script)?);
 
+    println!("{:#?}", ast);
+
     let buffer = match &image {
         Some(path) => ImageReader::open(path)?.decode()?.to_rgba8(),
         None => DynamicImage::new_rgba8(width.unwrap() as u32, height.unwrap() as u32).to_rgba8(),
@@ -137,7 +139,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Some(val) => report(
                         ErrorType::Runtime,
                         ast.line,
-                        format!("Returned color must be vec4, got {:?}", val).as_str(),
+                        format!("Returned color must be vec4, got {:?}", val),
                     ),
                 };
                 ret.env
@@ -171,7 +173,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     match frame_count {
-        0 => panic!("YO! What the FUCK am i supposed to do with 0 frames?"),
+        0 => panic!("Expected positive number of frames for image/gif generations, got 0"),
         1 => bytes_to_dynimg(frames.pop().unwrap()).save(&out_path)?,
         _ => {
             out_path.push_str(".gif");

@@ -124,7 +124,7 @@ impl PreProcessor {
                         report(
                             ErrorType::Preprocessor,
                             self.peek().line,
-                            format!("Expected '}}' in '{}' macro definition", name.lexeme).as_str(),
+                            format!("Expected '}}' in '{}' macro definition", name.lexeme),
                         );
                     }
 

@@ -8,18 +8,17 @@ macro complex_abs(complex) {
 
 z = coord / resolution
 z = [mix(-2, 2, z.x), mix(-1, 1, z.y)] 
+# c = [0, 0]
 c = [-0.12, -0.77]
 
 abs = 0
 
 n = 0
 
-repeat 100 {
-    {
-        abs = complex_abs(z)
-        z = complex_mult(z, z) + c
-        n = n + 1
-    } if abs <= 2 else {}
+while abs <= 2, 100 {
+    abs = complex_abs(z)
+    z = complex_mult(z, z) + c
+    n = n + 1
 }
 
 col = n / 100

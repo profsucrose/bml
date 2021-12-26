@@ -647,6 +647,7 @@ pub enum BuiltIn {
 pub enum Ast {
     V(Val),
     Repeat(f32, Box<SrcAst>),
+    While(Box<SrcAst>, f32, Box<SrcAst>),
     Assign(Spur, Box<SrcAst>),
     Block(Vec<SrcAst>),
     VecLiteral(
@@ -688,6 +689,7 @@ impl SrcAst {
             ast: match ast {
                 V(v) => V(v),
                 Assign(s, t) => Assign(s, bmap(t)),
+                While(cond, n, block) => While(bmap(cond), n, bmap(block)),
                 Repeat(n, x) => Repeat(n, bmap(x)),
                 Block(nodes) => Block(nodes.into_iter().map(map).collect()),
                 VecLiteral(x, y, z, w) => {
@@ -848,6 +850,7 @@ pub fn is_const(SrcAst { ast, .. }: &SrcAst) -> bool {
     match ast {
         &V(_) => true,
         Assign(_, _) => false,
+        While(cond, _, block) => is_const(cond) && is_const(block),
         Repeat(_, e) => is_const(e),
         Give(_) => false,
         Block(nodes) => matches!(
@@ -923,7 +926,7 @@ macro_rules! builtin_one_arg {
             report(
                 ErrorType::Runtime,
                 $line,
-                format!("Expected 1 input to {}(a), got {}", $function, $len).as_str(),
+                format!("Expected 1 input to {}(a), got {}", $function, $len),
             )
         }
 
@@ -937,7 +940,7 @@ macro_rules! builtin_two_args {
             report(
                 ErrorType::Runtime,
                 $line,
-                format!("Expected 2 inputs to {}(a, b), got {}", $function, $len).as_str(),
+                format!("Expected 2 inputs to {}(a, b), got {}", $function, $len),
             )
         }
 
@@ -957,7 +960,7 @@ macro_rules! builtin_three_args {
             report(
                 ErrorType::Runtime,
                 $line,
-                format!("Expected 3 inputs to {}(a, b, c), got {}", $function, $len).as_str(),
+                format!("Expected 3 inputs to {}(a, b, c), got {}", $function, $len),
             )
         }
 
@@ -978,13 +981,13 @@ pub fn eval<'a>(&SrcAst { line, ref ast }: &SrcAst, e: Env<'a>, r: &Rodeo) -> Ev
     match ast {
         Repeat(times, block) => {
             if *times < 1.0 - f32::EPSILON {
-                report(ErrorType::Runtime, line, format!("Expected positive compile-time literal in repeat statement, got {}", times).as_str());
+                report(ErrorType::Runtime, line, format!("Expected positive compile-time literal in repeat statement, got {}", times));
             }
 
             let t = *times as usize;
 
             if (times - (t as f32)).abs() > f32::EPSILON {
-                report(ErrorType::Runtime, line, format!("Expected whole number in repeat statement, got {}", times).as_str());
+                report(ErrorType::Runtime, line, format!("Expected whole number in repeat statement, got {}", times));
             }
 
             let mut ret = eval(block, e, &r);
@@ -995,6 +998,35 @@ pub fn eval<'a>(&SrcAst { line, ref ast }: &SrcAst, e: Env<'a>, r: &Rodeo) -> Ev
 
             ret
         }
+        While(cond, times, block) => {
+            if *times < 1.0 - f32::EPSILON {
+                report(ErrorType::Runtime, line, format!("Expected positive number of iterations in while statement, got {}", times));
+            }
+
+            let t = *times as usize;
+
+            if (times - (t as f32)).abs() > f32::EPSILON {
+                report(ErrorType::Runtime, line, format!("Expected whole number of iterations in while statement, got {}", times));
+            }
+
+            let mut env = e;
+
+            for _ in 0..t {
+                let ERVal { env: e, val } = eval(cond, env, r).needs_val();
+                env = e;
+
+                match val {
+                    Float(condition) => if condition != 1.0 {
+                        break
+                    },
+                    x => report(ErrorType::Runtime, line, format!("Expected condition to evaluate to float in while statement, got {:?}", x))
+                }
+
+                env = eval(block, env, r).env;
+            }
+
+            EvalRet::new(env)
+       }
         &V(v) => EvalRet::new(e).with_val(Some(v)),
         Assign(i, to) => {
             let ERVal { mut env, val } = eval(&to, e, r).needs_val();
@@ -1074,7 +1106,7 @@ pub fn eval<'a>(&SrcAst { line, ref ast }: &SrcAst, e: Env<'a>, r: &Rodeo) -> Ev
                 report(
                     ErrorType::Runtime,
                     line,
-                    format!("Expected float when indexing matrix, got {:?}", access).as_str(),
+                    format!("Expected float when indexing matrix, got {:?}", access),
                 )
             };
 
@@ -1085,7 +1117,7 @@ pub fn eval<'a>(&SrcAst { line, ref ast }: &SrcAst, e: Env<'a>, r: &Rodeo) -> Ev
                 _ => report(
                     ErrorType::Runtime,
                     line,
-                    format!("Expected matrix when indexing, got {:?}", matrix).as_str(),
+                    format!("Expected matrix when indexing, got {:?}", matrix),
                 ),
             };
 
@@ -1101,7 +1133,7 @@ pub fn eval<'a>(&SrcAst { line, ref ast }: &SrcAst, e: Env<'a>, r: &Rodeo) -> Ev
                 report(
                     ErrorType::Runtime,
                     line,
-                    format!("Expected vector when swizzling, got {}", x).as_str(),
+                    format!("Expected vector when swizzling, got {}", x),
                 );
             }
 
@@ -1128,7 +1160,7 @@ pub fn eval<'a>(&SrcAst { line, ref ast }: &SrcAst, e: Env<'a>, r: &Rodeo) -> Ev
             report(
                 ErrorType::Runtime,
                 line,
-                format!("Couldn't resolve identifier '{}'", r.resolve(&i)).as_str(),
+                format!("Couldn't resolve identifier '{}'", r.resolve(&i)),
             )
         }
         Return(v) => {
@@ -1168,7 +1200,7 @@ pub fn eval<'a>(&SrcAst { line, ref ast }: &SrcAst, e: Env<'a>, r: &Rodeo) -> Ev
                 _ => report(
                     ErrorType::Runtime,
                     line,
-                    format!("Unexpected scalar/vector binary operation relationship, got {:#?} {:#?} {:#?}", lval, op, rval).as_str(),
+                    format!("Unexpected scalar/vector binary operation relationship, got {:#?} {:#?} {:#?}", lval, op, rval),
                 )
             }))
         }
@@ -1208,7 +1240,7 @@ pub fn eval<'a>(&SrcAst { line, ref ast }: &SrcAst, e: Env<'a>, r: &Rodeo) -> Ev
                         report(
                             ErrorType::Runtime,
                             line,
-                            format!("Expected 2 inputs to mat2(vec2, vec2), got {}", len).as_str(),
+                            format!("Expected 2 inputs to mat2(vec2, vec2), got {}", len),
                         );
                     }
 
@@ -1278,7 +1310,7 @@ pub fn eval<'a>(&SrcAst { line, ref ast }: &SrcAst, e: Env<'a>, r: &Rodeo) -> Ev
 
                     let mat = match (arg1, arg2, arg3, arg4) {
                         (Vec4(x0, y0, z0, w0), Vec4(x1, y1, z1, w1), Vec4(x2, y2, z2, w2), Vec4(x3, y3, z3, w3)) => Mat4([x0, y0, z0, w0], [x1, y1, z1, w1], [x2, y2, z2, w2], [x3, y3, z3, w3]),
-                        (x, y, z, w) => report(ErrorType::Runtime, line, format!("Expected mat4(vec4, vec4, vec4, vec4), got mat4({:?}, {:?}, {:?}, {:?})", x, y, z, w).as_str())
+                        (x, y, z, w) => report(ErrorType::Runtime, line, format!("Expected mat4(vec4, vec4, vec4, vec4), got mat4({:?}, {:?}, {:?}, {:?})", x, y, z, w))
                     };
 
                     EvalRet::new(env).with_val(Some(mat))
@@ -1298,7 +1330,7 @@ pub fn eval<'a>(&SrcAst { line, ref ast }: &SrcAst, e: Env<'a>, r: &Rodeo) -> Ev
 
                     let pixel = match (vals.pop().unwrap(), &env.sampler) {
                         (Vec2(x, y), Some(sampler)) => sampler.sample(x, y),
-                        (x, _) => report(ErrorType::Runtime, line, format!("Expected sample(vec2), got sample({:?}", x).as_str())
+                        (x, _) => report(ErrorType::Runtime, line, format!("Expected sample(vec2), got sample({:?}", x))
                     };
 
                     EvalRet::new(env).with_val(Some(pixel))
@@ -1392,37 +1424,37 @@ pub fn eval<'a>(&SrcAst { line, ref ast }: &SrcAst, e: Env<'a>, r: &Rodeo) -> Ev
                 }
                 BuiltIn::RotateX => {
                     if len != 1 {
-                        report(ErrorType::Runtime, line, format!("Expected 1 input to rotate_x(a), got {}", len).as_str());
+                        report(ErrorType::Runtime, line, format!("Expected 1 input to rotate_x(a), got {}", len));
                     }
 
                     match vals.pop().unwrap() {
                         Float(radians) => EvalRet::new(env).with_val(Some(Val::rotate_x(radians))),
-                        x => report(ErrorType::Runtime, line, format!("Expected rotate_x(float), got rotate_x({:?})", x).as_str())
+                        x => report(ErrorType::Runtime, line, format!("Expected rotate_x(float), got rotate_x({:?})", x))
                     }
                 }
                 BuiltIn::RotateY => {
                     if len != 1 {
-                        report(ErrorType::Runtime, line, format!("Expected 1 input to rotate_y(a), got {}", len).as_str());
+                        report(ErrorType::Runtime, line, format!("Expected 1 input to rotate_y(a), got {}", len));
                     }
 
                     match vals.pop().unwrap() {
                         Float(radians) => EvalRet::new(env).with_val(Some(Val::rotate_y(radians))),
-                        x => report(ErrorType::Runtime, line, format!("Expected rotate_y(float), got rotate_y({:?})", x).as_str())
+                        x => report(ErrorType::Runtime, line, format!("Expected rotate_y(float), got rotate_y({:?})", x))
                     }
                 },
                 BuiltIn::RotateZ => {
                     if len != 1 {
-                        report(ErrorType::Runtime, line, format!("Expected 1 input to rotate_z(a), got {}", len).as_str());
+                        report(ErrorType::Runtime, line, format!("Expected 1 input to rotate_z(a), got {}", len));
                     }
 
                     match vals.pop().unwrap() {
                         Float(radians) => EvalRet::new(env).with_val(Some(Val::rotate_z(radians))),
-                        x => report(ErrorType::Runtime, line, format!("Expected rotate_z(float), got rotate_z({:?})", x).as_str())
+                        x => report(ErrorType::Runtime, line, format!("Expected rotate_z(float), got rotate_z({:?})", x))
                     }
                 },
                 BuiltIn::Rotate => {
                     if len != 3 {
-                        report(ErrorType::Runtime, line, format!("Expected 3 inputs to rotate(a, b, c), got {}", len).as_str());
+                        report(ErrorType::Runtime, line, format!("Expected 3 inputs to rotate(a, b, c), got {}", len));
                     }
 
                     let arg3 = vals.pop().unwrap();
@@ -1431,22 +1463,22 @@ pub fn eval<'a>(&SrcAst { line, ref ast }: &SrcAst, e: Env<'a>, r: &Rodeo) -> Ev
 
                     match (arg1, arg2, arg3) {
                         (Float(yaw), Float(pitch), Float(roll)) => EvalRet::new(env).with_val(Some(Val::rotate(yaw, pitch, roll))),
-                        (x, y, z) => report(ErrorType::Runtime, line, format!("Expected rotate(float, float, float), got rotate({:?}, {:?}, {:?})", x, y, z).as_str())
+                        (x, y, z) => report(ErrorType::Runtime, line, format!("Expected rotate(float, float, float), got rotate({:?}, {:?}, {:?})", x, y, z))
                     }
                 },
                 BuiltIn::Scale => {
                     if len != 1 {
-                        report(ErrorType::Runtime, line, format!("Expected 1 input to scale(a), got {}", len).as_str());
+                        report(ErrorType::Runtime, line, format!("Expected 1 input to scale(a), got {}", len));
                     }
 
                     match vals.pop().unwrap() {
                         Float(s) => EvalRet::new(env).with_val(Some(Val::scale(s))),
-                        x => report(ErrorType::Runtime, line, format!("Expected scale(float), got scale({:?})", x).as_str())
+                        x => report(ErrorType::Runtime, line, format!("Expected scale(float), got scale({:?})", x))
                     }
                 }
                 BuiltIn::Translate => {
                     if len != 3 {
-                        report(ErrorType::Runtime, line, format!("Expected 3 inputs to translate(a, b, c), got {}", len).as_str());
+                        report(ErrorType::Runtime, line, format!("Expected 3 inputs to translate(a, b, c), got {}", len));
                     }
 
                     let arg3 = vals.pop().unwrap();
@@ -1455,12 +1487,12 @@ pub fn eval<'a>(&SrcAst { line, ref ast }: &SrcAst, e: Env<'a>, r: &Rodeo) -> Ev
 
                     match (arg1, arg2, arg3) {
                         (Float(x), Float(y), Float(z)) => EvalRet::new(env).with_val(Some(Val::translate(x, y, z))),
-                        (x, y, z) => report(ErrorType::Runtime, line, format!("Expected translate(float, float, float), got translate({:?}, {:?}, {:?})", x, y, z).as_str())
+                        (x, y, z) => report(ErrorType::Runtime, line, format!("Expected translate(float, float, float), got translate({:?}, {:?}, {:?})", x, y, z))
                     }
                 },
                 BuiltIn::Ortho => {
                     if len != 6 {
-                        report(ErrorType::Runtime, line, format!("Expected 6 inputs to ortho(a, b, c, d, e, f), got {}", len).as_str());
+                        report(ErrorType::Runtime, line, format!("Expected 6 inputs to ortho(a, b, c, d, e, f), got {}", len));
                     }
 
                     let arg6 = vals.pop().unwrap();
@@ -1472,12 +1504,12 @@ pub fn eval<'a>(&SrcAst { line, ref ast }: &SrcAst, e: Env<'a>, r: &Rodeo) -> Ev
 
                     match (arg1, arg2, arg3, arg4, arg5, arg6) {
                         (Float(near), Float(far), Float(left), Float(right), Float(top), Float(bottom)) => EvalRet::new(env).with_val(Some(Val::ortho(near, far, left, right, top, bottom))),
-                        (x, y, z, w, v, u) => report(ErrorType::Runtime, line, format!("Expected ortho(float, float, float, float, float, float), got ortho({:?}, {:?}, {:?}, {:?}, {:?}, {:?})", x, y, z, w, v, u).as_str())
+                        (x, y, z, w, v, u) => report(ErrorType::Runtime, line, format!("Expected ortho(float, float, float, float, float, float), got ortho({:?}, {:?}, {:?}, {:?}, {:?}, {:?})", x, y, z, w, v, u))
                     }
                 }
                 BuiltIn::LookAt => {
                     if len != 2 {
-                        report(ErrorType::Runtime, line, format!("Expected 2 inputs to lookat(a, b), got {}", len).as_str());
+                        report(ErrorType::Runtime, line, format!("Expected 2 inputs to lookat(a, b), got {}", len));
                     }
 
                     let arg2 = vals.pop().unwrap();
@@ -1485,12 +1517,12 @@ pub fn eval<'a>(&SrcAst { line, ref ast }: &SrcAst, e: Env<'a>, r: &Rodeo) -> Ev
     
                     match (arg1, arg2) {
                         (Vec3(_, _, _), Vec3(_, _, _)) => EvalRet::new(env).with_val(Some(Val::lookat(arg1, arg2))),
-                        (x, y) => report(ErrorType::Runtime, line, format!("Expected lookat(vec3, vec3), got lookat({:?}, {:?})", x, y).as_str())
+                        (x, y) => report(ErrorType::Runtime, line, format!("Expected lookat(vec3, vec3), got lookat({:?}, {:?})", x, y))
                     }
                 }
                 BuiltIn::Perspective => {
                     if len != 2 {
-                        report(ErrorType::Runtime, line, format!("Expected 2 inputs to lookat(a, b), got {}", len).as_str());
+                        report(ErrorType::Runtime, line, format!("Expected 2 inputs to lookat(a, b), got {}", len));
                     }
 
                     let arg2 = vals.pop().unwrap();
@@ -1498,7 +1530,7 @@ pub fn eval<'a>(&SrcAst { line, ref ast }: &SrcAst, e: Env<'a>, r: &Rodeo) -> Ev
     
                     match (arg1, arg2) {
                         (Vec3(_, _, _), Vec3(_, _, _)) => EvalRet::new(env).with_val(Some(Val::lookat(arg1, arg2))),
-                        (x, y) => report(ErrorType::Runtime, line, format!("Expected lookat(vec3, vec3), got lookat({:?}, {:?})", x, y).as_str())
+                        (x, y) => report(ErrorType::Runtime, line, format!("Expected lookat(vec3, vec3), got lookat({:?}, {:?})", x, y))
                     }
                 }
             }

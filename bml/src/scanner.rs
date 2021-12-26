@@ -22,6 +22,7 @@ impl Scanner {
         keywords.insert("give", TokenType::Give);
         keywords.insert("macro", TokenType::Macro);
         keywords.insert("repeat", TokenType::Repeat);
+        keywords.insert("while", TokenType::While);
 
         keywords.insert("vec2", TokenType::Vec2);
         keywords.insert("vec3", TokenType::Vec3);
@@ -118,7 +119,7 @@ impl Scanner {
                 } else if c.is_alphabetic() {
                     self.identifier();
                 } else {
-                    report(ErrorType::Scanner, self.line, format!("Unexpected character '{}'", c).as_str())
+                    report(ErrorType::Scanner, self.line, format!("Unexpected character '{}'", c))
                 }
             }
         }

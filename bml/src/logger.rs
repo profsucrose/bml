@@ -16,21 +16,21 @@ pub fn info(message: &str) {
     println!("{}", message);
 }
 
-pub fn success_eval(output: Option<String>) {
+pub fn success_eval<S: AsRef<str>>(output: Option<S>) {
     print!("{}", "Returned: ".bold());
 
     match output {
-        Some(output) => print!("{}", output),
+        Some(output) => print!("{}", output.as_ref()),
         None => print!("<null>")
     }
 
     println!();
 }
 
-pub fn success_image(path: &str) {
+pub fn success_image<S: AsRef<str>>(path: S) {
     print!("{} ", "Success!".green().bold());
     print!("Output to: ");
-    print!("{}", path.underline());
+    print!("{}", path.as_ref().underline());
     println!();
 }
 
@@ -46,18 +46,20 @@ pub fn help() -> ! {
       Process and manipulate an image with a script and output the result, either at an automatically determined path or at a specified path.
   bml new <script> <width> <height> <frames> <output_path>
       Generate new image with a given width and height with a script and write the result to a path.");
-    println!();
+    
+      println!();
+    
     println!(" Process and manipulate images, or generate new ones, using the Buffer Manipulation Language.");
 
     process::exit(1);
 }
 
-pub fn report(error: ErrorType, line: usize, message: &str) -> ! {
+pub fn report<S: AsRef<str>>(error: ErrorType, line: usize, message: S) -> ! {
     println!(
         "{}{}{}",
-        format!("{:?}Error", error).as_str().bright_red().bold(),
-        format!(" [line {}]", line).as_str().yellow(),
-        format!(": {}", message).as_str()
+        format!("{:?}Error", error).bright_red().bold(),
+        format!(" [line {}]", line).yellow(),
+        format!(": {}", message.as_ref())
     );
 
     println!("{}", "Aborting...".bold());

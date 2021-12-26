@@ -1,3 +1,7 @@
 # test
 
-# return [frag.g, frag.g, frag.r, 1]
+n = {
+    give 1
+} + 2
+
+return n

@@ -108,7 +108,58 @@ impl<'a> Parser<'a> {
             return self.repeat();
         }
 
+        if self.match_token(TokenType::While) {
+            return self.r#while();
+        }
+
         self.r#if()
+    }
+
+    fn r#while(&mut self) -> SrcAst {
+        let cond = self.expression();
+
+        self.consume(TokenType::Comma, "Expected ',' in while statement");
+
+        if !self.match_token(TokenType::Number) {
+            report(
+                ErrorType::Parse,
+                self.peek().line,
+                format!(
+                    "Expected positive number literal in while statement, got '{}'",
+                    self.peek().lexeme
+                )
+                .as_str(),
+            );
+        }
+
+        let times = match self.previous().lexeme.parse::<f32>() {
+            Ok(times) => times,
+            Err(_) => report(
+                ErrorType::Parse,
+                self.previous().line,
+                format!(
+                    "Expected number literal in while statement, got '{}'",
+                    self.previous().lexeme
+                )
+                .as_str(),
+            ),
+        };
+
+        if !self.match_token(TokenType::LeftBracket) {
+            report(
+                ErrorType::Parse,
+                self.previous().line,
+                format!(
+                    "Expected '{{' in while block, got '{}'",
+                    self.previous().lexeme
+                )
+                .as_str(),
+            );
+        }
+
+        let block = self.block();
+
+        SrcAst::new(Ast::While(Box::new(cond), times, Box::new(block)), self.previous().line)
     }
 
     fn repeat(&mut self) -> SrcAst {
@@ -197,10 +248,6 @@ impl<'a> Parser<'a> {
     }
 
     fn expression(&mut self) -> SrcAst {
-        if self.match_token(TokenType::LeftBracket) {
-            return self.block();
-        }
-
         self.equality()
     }
 
@@ -213,7 +260,7 @@ impl<'a> Parser<'a> {
                 _ => report(
                     ErrorType::Parse,
                     self.previous().line,
-                    format!("Unexpected binary operator \'{}\'", self.previous().lexeme).as_str(),
+                    format!("Unexpected binary operator \'{}\'", self.previous().lexeme),
                 ),
             };
 
@@ -444,7 +491,7 @@ impl<'a> Parser<'a> {
         report(
             ErrorType::Parse,
             self.peek().line,
-            format!("Unexpected '{}' in expression", self.peek().lexeme).as_str(),
+            format!("Unexpected '{}' in expression", self.peek().lexeme),
         )
     }
 
@@ -526,7 +573,7 @@ impl<'a> Parser<'a> {
             report(
                 ErrorType::Parse,
                 token.line,
-                format!("Built-in function '{}' does not exist", name).as_str(),
+                format!("Built-in function '{}' does not exist", name),
             )
         };
 

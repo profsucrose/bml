@@ -1,0 +1,15 @@
+radius = 0.5
+
+uv = coord / resolution
+
+world_space = [uv.x, uv.y, 0, 0]
+
+world_space = scale(1) * world_space
+
+col = {
+    give [1 - dist(world_space, [0.5, 0.5, 0, 0]); 3]
+} if dist(world_space, [0.5, 0.5, 0, 0]) < radius else {
+    give [0, 0, 0]
+}
+
+return [col.x, col.y, col.z, 1]

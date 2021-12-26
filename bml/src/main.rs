@@ -1,9 +1,11 @@
-use std::{process};
+use std::process;
 
 use ast::Val;
-use bml::{ast::{self, eval, Ast, Sampler}, logger::{ErrorType, report, help, success_image, success_eval}};
+use bml::{
+    ast::{self, eval, Sampler},
+    logger::{help, report, success_eval, success_image, ErrorType},
+};
 use image::{io::Reader as ImageReader, DynamicImage};
-use lasso::Rodeo;
 
 macro_rules! gen_runtime_idents {
     ($($x:ident $(,)? )*) => {
@@ -21,10 +23,10 @@ gen_runtime_idents!(resolution, coord, frag, frame, frame_count);
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
 
-    let (script, image, output_path, width, height, frame_count) = match args.next().as_deref()  {
+    let (script, image, output_path, width, height, frame_count) = match args.next().as_deref() {
         None => {
             help();
-        },
+        }
         Some("eval") => {
             let script = if let Some(script) = args.next() {
                 script
@@ -32,31 +34,48 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 help();
             };
 
-            let (rodeo, ast) = compile(script.as_str()).unwrap();
+            let (rodeo, ast) = bml::string_to_ast(std::fs::read_to_string(script)?);
             let env = ast::Env::default();
             let output = eval(&ast, env, &rodeo).env.ret.take();
 
             success_eval(output.map(|v| format!("{:?}", v)));
-        
+
             process::exit(0)
-        },
+        }
         Some("process") => match (args.next(), args.next(), args.next(), args.next()) {
-            (Some(script), Some(image), Some(frame_count), output) => match frame_count.parse::<usize>() {
-                Ok(frame_count) => (script, Some(image), output, None, None, frame_count),
-                _ => help()
+            (Some(script), Some(image), Some(frame_count), output) => {
+                match frame_count.parse::<usize>() {
+                    Ok(frame_count) => (script, Some(image), output, None, None, frame_count),
+                    _ => help(),
+                }
             }
-            _ => help()
-        }
-        Some("new") => match (args.next(), args.next(), args.next(), args.next(), args.next()) {
-            (Some(script), Some(width), Some(height), Some(frame_count), Some(output)) => match (frame_count.parse::<usize>(), width.parse::<usize>(), height.parse::<usize>()) {
-                (Ok(frames), Ok(width), Ok(height)) => {
-                    (script, None, Some(output), Some(width), Some(height), frames)
-                },
-                _ => help()
-            }
-            _ => help()
-        }
-        _ => help()
+            _ => help(),
+        },
+        Some("new") => match (
+            args.next(),
+            args.next(),
+            args.next(),
+            args.next(),
+            args.next(),
+        ) {
+            (Some(script), Some(width), Some(height), Some(frame_count), Some(output)) => match (
+                frame_count.parse::<usize>(),
+                width.parse::<usize>(),
+                height.parse::<usize>(),
+            ) {
+                (Ok(frames), Ok(width), Ok(height)) => (
+                    script,
+                    None,
+                    Some(output),
+                    Some(width),
+                    Some(height),
+                    frames,
+                ),
+                _ => help(),
+            },
+            _ => help(),
+        },
+        _ => help(),
     };
 
     // should be no additional arguments
@@ -64,11 +83,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         help();
     }
 
-    let (mut rodeo, ast) = compile(script.as_str()).unwrap();
+    let (mut rodeo, ast) = bml::string_to_ast(std::fs::read_to_string(&script)?);
 
     let buffer = match &image {
         Some(path) => ImageReader::open(path)?.decode()?.to_rgba8(),
-        None => DynamicImage::new_rgba8(width.unwrap() as u32, height.unwrap() as u32).to_rgba8()
+        None => DynamicImage::new_rgba8(width.unwrap() as u32, height.unwrap() as u32).to_rgba8(),
     };
 
     let rti = RuntimeIdents::new(&mut rodeo);
@@ -110,8 +129,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         frame.push((255.0 * z) as u8);
                         frame.push((255.0 * w) as u8);
                     }
-                    None => report(ErrorType::Runtime, ast.line, "Expected program to return vec4, got nothing"),
-                    Some(val) => report(ErrorType::Runtime, ast.line, format!("Returned color must be vec4, got {:?}", val).as_str()),
+                    None => report(
+                        ErrorType::Runtime,
+                        ast.line,
+                        "Expected program to return vec4, got nothing",
+                    ),
+                    Some(val) => report(
+                        ErrorType::Runtime,
+                        ast.line,
+                        format!("Returned color must be vec4, got {:?}", val).as_str(),
+                    ),
                 };
                 ret.env
             });
@@ -135,7 +162,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .and_then(|x| x.to_str())
                     .expect("Could not extract file stem from script name"),
             );
-        
+
             path.push('_');
             path.push_str(&image.unwrap());
 
@@ -160,19 +187,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .map(|img| image::Frame::from_parts(img, 0, 0, delay)),
             )?;
         }
-    } 
+    }
 
     success_image(out_path.as_str());
 
     Ok(())
-}
-
-fn compile(script: &str) -> Result<(Rodeo, Ast), Box<dyn std::error::Error>> {
-    let file = std::fs::read_to_string(&script).expect(format!("Could not find file '{}'", script).as_str());
-    let raw = bml::Scanner::from(file).scan();
-    let expanded = bml::PreProcessor::from(raw).process();
-
-    // println!("{:?}", expanded.iter().map(|x| format!("{} ", x.lexeme)).collect::<String>());
-
-    Ok(bml::Parser::from(&expanded).parse())
 }

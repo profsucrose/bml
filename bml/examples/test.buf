@@ -1,7 +1,3 @@
 # test
 
-n = {
-    give 1
-} + 2
-
-return n
+return 1 != 0

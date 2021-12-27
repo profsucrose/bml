@@ -254,9 +254,12 @@ impl<'a> Parser<'a> {
     fn equality(&mut self) -> SrcAst {
         let mut equality = self.comparison();
 
-        while self.match_token(TokenType::EqualsEquals) {
+        while self.match_token(TokenType::EqualsEquals) 
+            || self.match_token(TokenType::NotEquals)
+        {
             let operator = match self.previous().token_type {
                 TokenType::EqualsEquals => Op::Equal,
+                TokenType::NotEquals => Op::NotEqual,
                 _ => report(
                     ErrorType::Parse,
                     self.previous().line,

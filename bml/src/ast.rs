@@ -16,6 +16,7 @@ pub enum Op {
     MoreEq,
     LessEq,
     Equal,
+    NotEqual
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -145,6 +146,10 @@ impl Val {
             (Vec2(lx, ly), Float(r)) => Vec2(f(lx, r), f(ly, r)),
             (Vec3(lx, ly, lz), Float(r)) => Vec3(f(lx, r), f(ly, r), f(lz, r)),
             (Vec4(lx, ly, lz, lw), Float(r)) => Vec4(f(lx, r), f(ly, r), f(lz, r), f(lw, r)),
+
+            (Float(r), Vec2(lx, ly)) => Vec2(f(r, lx), f(r, ly)),
+            (Float(r), Vec3(lx, ly, lz)) => Vec3(f(r, lx), f(r, ly), f(r, lz)),
+            (Float(r), Vec4(lx, ly, lz, lw)) => Vec4(f(r, lx), f(r, ly), f(r, lz), f(r, lw)),
 
             (Vec2(lx, ly), Vec2(rx, ry)) => Vec2(f(lx, rx), f(ly, ry)),
             (Vec3(lx, ly, lz), Vec3(rx, ry, rz)) => Vec3(f(lx, rx), f(ly, ry), f(lz, rz)),
@@ -1177,15 +1182,6 @@ pub fn eval<'a>(&SrcAst { line, ref ast }: &SrcAst, e: Env<'a>, r: &Rodeo) -> Ev
 
             use Val::*;
             EvalRet::new(env).with_val(Some(match (lval, op, rval) {
-                (Float(_), Op::Sub, Vec2(_, _) | Vec3(_, _, _) | Vec4(_, _, _, _)) => {
-                    report(ErrorType::Runtime, line, "Expected vector - float, got float - vector");
-                }
-                (Float(_), Op::Add, Vec2(_, _) | Vec3(_, _, _) | Vec4(_, _, _, _)) => {
-                    report(ErrorType::Runtime, line, "Expected vector + float, got float + vector");
-                }
-                (Float(_), Op::Div, Vec2(_, _) | Vec3(_, _, _) | Vec4(_, _, _, _)) => {
-                    report(ErrorType::Runtime, line, "Expected vector / float, got float / vector")
-                }
                 (_, Op::Sub, _) => lval.zipmap(rval, |l, r| l - r),
                 (_, Op::Add, _) => lval.zipmap(rval, |l, r| l + r),
                 (_, Op::Mul, _) => match lval.mult(rval) {
@@ -1198,6 +1194,7 @@ pub fn eval<'a>(&SrcAst { line, ref ast }: &SrcAst, e: Env<'a>, r: &Rodeo) -> Ev
                 (Float(l), Op::MoreEq, Float(r)) => Float((l >= r) as i32 as f32),
                 (Float(l), Op::LessEq, Float(r)) => Float((l <= r) as i32 as f32),
                 (Float(l), Op::Equal, Float(r)) => Float(if l == r { 1.0 } else { 0.0 }),
+                (Float(l), Op::NotEqual, Float(r)) => Float(if l != r { 1.0 } else { 0.0 }),
                 _ => report(
                     ErrorType::Runtime,
                     line,

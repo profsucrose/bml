@@ -80,6 +80,13 @@ impl Scanner {
             '+' => self.add_token(TokenType::Plus),
             '*' => self.add_token(TokenType::Star),
             '/' => self.add_token(TokenType::Slash),
+            '!' => {
+                if self.match_lexeme('=') {
+                    self.add_token(TokenType::NotEquals)
+                } else {
+                    self.unexpected_char(c);
+                }
+            }
             '=' => {
                 let token = if self.match_lexeme('=') {
                     TokenType::EqualsEquals
@@ -119,10 +126,14 @@ impl Scanner {
                 } else if c.is_alphabetic() {
                     self.identifier();
                 } else {
-                    report(ErrorType::Scanner, self.line, format!("Unexpected character '{}'", c))
+                    self.unexpected_char(c);
                 }
             }
         }
+    }
+    
+    fn unexpected_char(&self, c: char) -> ! {
+        report(ErrorType::Scanner, self.line, format!("Unexpected character '{}'", c))
     }
 
     fn swazzle(&mut self) {

@@ -1,11 +1,11 @@
-use std::process;
-use rayon::prelude::*;
 use ast::Val;
 use bml::{
     ast::{self, eval, Sampler},
     logger::{help, report, success_eval, success_image, ErrorType},
 };
 use image::{io::Reader as ImageReader, DynamicImage};
+use rayon::prelude::*;
+use std::process;
 
 macro_rules! gen_runtime_idents {
     ($($x:ident $(,)? )*) => {
@@ -19,6 +19,7 @@ macro_rules! gen_runtime_idents {
 }
 
 gen_runtime_idents!(resolution, coord, frag, frame, frame_count);
+
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
@@ -100,59 +101,75 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut frames = Vec::with_capacity(frame_count);
 
+    let thread_count = match std::env::var("BML_THREADS") {
+        Ok(threads) => threads.parse::<usize>().expect("Environment variable 'BML_THREADS' was not set to a positive integer"),
+        Err(_) => 2
+    };
+
     (0..frame_count).for_each(|frame| {
         env.set(rti.frame, Val::Float(frame as _));
 
         // let mut frame = Vec::with_capacity((4 * width * height) as usize);
 
-        let mut frame = buffer
-            .enumerate_pixels()
-            .par_bridge()
+        let size = (width * height) as usize;
+
+        let mut frame = (0..thread_count)
             .into_par_iter()
-            .map(|(x, y, rgba)| {
-                let [r, g, b, a] = rgba.0;
+            .map(|i| {
+                (
+                    i,
+                    (size * i / thread_count..size * (i + 1) / thread_count)
+                        .flat_map(|index| {
+                            let x = (index as u32) % width;
+                            let y = (index as u32) / height;
 
-                let mut env = env.clone();
+                            let [r, g, b, a] = buffer.get_pixel(x, y).0;
 
-                env.set(rti.coord, Val::Vec2(x as _, y as _));
-                env.set(
-                    rti.frag,
-                    Val::Vec4(
-                        r as f32 / 255.0,
-                        g as f32 / 255.0,
-                        b as f32 / 255.0,
-                        a as f32 / 255.0,
-                    ),
-                );
+                            let mut env = env.clone();
 
-                let mut ret = ast::eval(&ast, env, &rodeo);
+                            env.set(rti.coord, Val::Vec2(x as _, y as _));
+                            env.set(
+                                rti.frag,
+                                Val::Vec4(
+                                    r as f32 / 255.0,
+                                    g as f32 / 255.0,
+                                    b as f32 / 255.0,
+                                    a as f32 / 255.0,
+                                ),
+                            );
 
-                match ret.env.ret.take() {
-                    Some(Val::Vec4(r, g, b, a)) => {
-                        ((y as usize) * (width as usize) + (x as usize), [
-                            (255.0 * r) as u8,
-                            (255.0 * g) as u8,
-                            (255.0 * b) as u8,
-                            (255.0 * a) as u8
-                        ])
-                    }
-                    None => report(
-                        ErrorType::Runtime,
-                        ast.line,
-                        "Expected program to return vec4, got nothing",
-                    ),
-                    Some(val) => report(
-                        ErrorType::Runtime,
-                        ast.line,
-                        format!("Returned color must be vec4, got {:?}", val),
-                    ),
-                }
+                            let mut ret = ast::eval(&ast, env, &rodeo);
+
+                            match ret.env.ret.take() {
+                                Some(Val::Vec4(r, g, b, a)) => [
+                                    (255.0 * r) as u8,
+                                    (255.0 * g) as u8,
+                                    (255.0 * b) as u8,
+                                    (255.0 * a) as u8,
+                                ],
+                                None => report(
+                                    ErrorType::Runtime,
+                                    ast.line,
+                                    "Expected program to return vec4, got nothing",
+                                ),
+                                Some(val) => report(
+                                    ErrorType::Runtime,
+                                    ast.line,
+                                    format!("Returned color must be vec4, got {:?}", val),
+                                ),
+                            }
+                        })
+                        .collect::<Vec<u8>>(),
+                )
             })
-            .collect::<Vec<(usize, [u8; 4])>>();
+            .collect::<Vec<(usize, Vec<u8>)>>();
 
         frame.sort_by(|(idx1, _), (idx2, _)| idx1.cmp(idx2));
 
-        let frame = frame.into_iter().flat_map(|(_, pixel)| pixel).collect::<Vec<u8>>();
+        let frame = frame
+            .into_iter()
+            .flat_map(|(_, vec)| vec)
+            .collect::<Vec<u8>>();
 
         frames.push(frame);
     });

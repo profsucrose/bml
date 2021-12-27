@@ -1183,9 +1183,6 @@ pub fn eval<'a>(&SrcAst { line, ref ast }: &SrcAst, e: Env<'a>, r: &Rodeo) -> Ev
                 (Float(_), Op::Add, Vec2(_, _) | Vec3(_, _, _) | Vec4(_, _, _, _)) => {
                     report(ErrorType::Runtime, line, "Expected vector + float, got float + vector");
                 }
-                (Float(_), Op::Mul, Vec2(_, _) | Vec3(_, _, _) | Vec4(_, _, _, _)) => {
-                    report(ErrorType::Runtime, line, "Expected vector * float, got float * vector");
-                }
                 (Float(_), Op::Div, Vec2(_, _) | Vec3(_, _, _) | Vec4(_, _, _, _)) => {
                     report(ErrorType::Runtime, line, "Expected vector / float, got float / vector")
                 }

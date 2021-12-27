@@ -150,7 +150,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             })
             .collect::<Vec<(usize, [u8; 4])>>();
 
-        frame.sort_by(|(idx1, _), (idx2, _)| idx2.cmp(idx1));
+        frame.sort_by(|(idx1, _), (idx2, _)| idx1.cmp(idx2));
 
         let frame = frame.into_iter().flat_map(|(_, pixel)| pixel).collect::<Vec<u8>>();
 

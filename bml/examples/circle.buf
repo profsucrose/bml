@@ -1,44 +1,9 @@
-# rainbow circle that dynamically grows
-# and shrinks depending on the frame
-
-
-
-# built-ins
-x = sin(frame)
-y = cos(frame)
-
-# user-defined macros
-macro add_two(y) {
-    give y + 2
-}
-
-macro add_one(x) x + 1
-
-y = 2
-
-macro add_one(x, y) {
-    z = x + y
-
-    // w = add_two(2)
-
-    give z.y + y.x
-}
-
-vec = [1, 2, 3]
-vec.y = 2
-vec.yyz = [ 2, 2, 3 ]
-vec.zxy = [ 3, 1, 2 ]
-vec.zyyy
-
-my_variable = 10
-y = add_one([1, 2], [3, 4])
+# circle
 
 uv = coord / resolution
-distance = dist(uv, [0.5, 0.5])
-radius = (sin(frame / 2) + 2) / 2 * 0.2 + 0.1
 
 return {
-    give [sin(frame / 10.0), cos(frame / 10.0), 1, 1]
-} if distance < radius else {
-    give [0, 0, 0, 1]
+    give [1, 1, 1, 4]
+} if dist(uv, [0.5, 0.5]) < 0.5 else {
+    give [0, 0, 0, 1] 
 }

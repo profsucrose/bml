@@ -1,5 +1,5 @@
 use std::process;
-
+use rayon::prelude::*;
 use ast::Val;
 use bml::{
     ast::{self, eval, Sampler},
@@ -100,14 +100,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut frames = Vec::with_capacity(frame_count);
 
-    (0..frame_count).fold(env, |mut env, frame| {
+    (0..frame_count).for_each(|frame| {
         env.set(rti.frame, Val::Float(frame as _));
 
-        let mut frame = Vec::<u8>::with_capacity((width * height * 4) as usize);
-        let ret = buffer
+        // let mut frame = Vec::with_capacity((4 * width * height) as usize);
+
+        let mut frame = buffer
             .enumerate_pixels()
-            .fold(env, |mut env, (x, y, rgba)| {
+            .par_bridge()
+            .into_par_iter()
+            .map(|(x, y, rgba)| {
                 let [r, g, b, a] = rgba.0;
+
+                let mut env = env.clone();
 
                 env.set(rti.coord, Val::Vec2(x as _, y as _));
                 env.set(
@@ -123,11 +128,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mut ret = ast::eval(&ast, env, &rodeo);
 
                 match ret.env.ret.take() {
-                    Some(Val::Vec4(x, y, z, w)) => {
-                        frame.push((255.0 * x) as u8);
-                        frame.push((255.0 * y) as u8);
-                        frame.push((255.0 * z) as u8);
-                        frame.push((255.0 * w) as u8);
+                    Some(Val::Vec4(r, g, b, a)) => {
+                        ((y as usize) * (width as usize) + (x as usize), [
+                            (255.0 * r) as u8,
+                            (255.0 * g) as u8,
+                            (255.0 * b) as u8,
+                            (255.0 * a) as u8
+                        ])
                     }
                     None => report(
                         ErrorType::Runtime,
@@ -139,12 +146,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         ast.line,
                         format!("Returned color must be vec4, got {:?}", val),
                     ),
-                };
-                ret.env
-            });
+                }
+            })
+            .collect::<Vec<(usize, [u8; 4])>>();
+
+        frame.sort_by(|(idx1, _), (idx2, _)| idx2.cmp(idx1));
+
+        let frame = frame.into_iter().flat_map(|(_, pixel)| pixel).collect::<Vec<u8>>();
 
         frames.push(frame);
-        ret
     });
 
     let bytes_to_dynimg = move |bytes: Vec<u8>| -> image::RgbaImage {

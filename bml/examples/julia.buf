@@ -8,6 +8,11 @@ macro complex_abs(complex) {
 
 z = coord / resolution
 z = [mix(-2, 2, z.x), mix(-1, 1, z.y)] 
+
+# z = ([z.x, z.y, 0, 1] * perspective(45.0, 0.0, 100.0) * rotate_x(mix(0, 5 * 3.14159, frame / frame_count)))
+
+z = z.xy / (z.z)
+
 # c = [0, 0]
 c = [-0.12, -0.77]
 
@@ -21,7 +26,7 @@ while abs <= 2, 100 {
     n = n + 1
 }
 
-col = n / 100
+col = n / 10
 return [col, col, col, 1]
 
 

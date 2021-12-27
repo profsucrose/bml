@@ -219,7 +219,7 @@ impl Val {
             [  c, 0.0,  -s, 0.0],
             [0.0, 1.0, 0.0, 0.0],
             [  s, 0.0,   c, 0.0],
-            [  s, 0.0,   c, 1.0]
+            [0.0, 0.0, 0.0, 1.0]
         )
     }
 
@@ -751,7 +751,7 @@ impl<'a> Sampler<'a> {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct Env<'a> {
     vars: HashMap<Spur, Val>,
     sampler: Option<Sampler<'a>>,
@@ -1053,13 +1053,13 @@ pub fn eval<'a>(&SrcAst { line, ref ast }: &SrcAst, e: Env<'a>, r: &Rodeo) -> Ev
                     3 => EvalRet::new(env).with_val(Some(Val::Vec3(v, v, v))),
                     4 => EvalRet::new(env).with_val(Some(Val::Vec4(v, v, v, v))),
                     n => {
-                        panic!("{} is an invalid vector length; must be 2 <= x <= 4", n)
+                        report(ErrorType::Runtime, line, format!("{} is an invalid vector length; must be 2 <= x <= 4", n))
                     }
                 },
                 _ => report(
                     ErrorType::Runtime,
                     line,
-                    "Both X and L in [X; L] in vector literal must evaluate to scalars",
+                    format!("Expected [float; float] for vector, got [{:?}, {:?}]", value, length),
                 ),
             }
         }
@@ -1068,10 +1068,10 @@ pub fn eval<'a>(&SrcAst { line, ref ast }: &SrcAst, e: Env<'a>, r: &Rodeo) -> Ev
             let ERVal { val: yval, env } = eval(&yast, env, r).needs_val();
             match (xval, yval) {
                 (Float(x), Float(y)) => EvalRet::new(env).with_val(Some(Val::Vec2(x, y))),
-                _ => panic!(),
+                (x, y) => report(ErrorType::Runtime, line, format!("Expected [float, float] for vec2 initialization, got [{:?}, {:?}]", x, y))
             }
         }
-        VecLiteral(_, _, None, Some(_)) => panic!("fuck you"),
+        VecLiteral(_, _, None, Some(_)) => panic!("Unexpected vector initialization in AST (this is a bug in the interpreter)"),
         VecLiteral(xast, yast, Some(zast), None) => {
             let ERVal { val: xval, env } = eval(&xast, e, r).needs_val();
             let ERVal { val: yval, env } = eval(&yast, env, r).needs_val();
@@ -1080,7 +1080,7 @@ pub fn eval<'a>(&SrcAst { line, ref ast }: &SrcAst, e: Env<'a>, r: &Rodeo) -> Ev
                 (Float(x), Float(y), Float(z)) => {
                     EvalRet::new(env).with_val(Some(Val::Vec3(x, y, z)))
                 }
-                _ => panic!(),
+                (x, y, z) => report(ErrorType::Runtime, line, format!("Expected [float, float, float] for vec3 initialization, got [{:?}, {:?}, {:?}]", x, y, z))
             }
         }
         VecLiteral(xast, yast, Some(zast), Some(wast)) => {
@@ -1092,7 +1092,7 @@ pub fn eval<'a>(&SrcAst { line, ref ast }: &SrcAst, e: Env<'a>, r: &Rodeo) -> Ev
                 (Float(x), Float(y), Float(z), Float(w)) => {
                     EvalRet::new(env).with_val(Some(Val::Vec4(x, y, z, w)))
                 }
-                _ => panic!(),
+                (x, y, z, w) => report(ErrorType::Runtime, line, format!("Expected [float, float, float, float] for vec4 initialization, got [{:?}, {:?}, {:?}, {:?}]", x, y, z, w))
             }
         }
         MatAccess(mat, row) => {
@@ -1522,16 +1522,17 @@ pub fn eval<'a>(&SrcAst { line, ref ast }: &SrcAst, e: Env<'a>, r: &Rodeo) -> Ev
                     }
                 }
                 BuiltIn::Perspective => {
-                    if len != 2 {
-                        report(ErrorType::Runtime, line, format!("Expected 2 inputs to lookat(a, b), got {}", len));
+                    if len != 3 {
+                        report(ErrorType::Runtime, line, format!("Expected 3 inputs to perspective(a, b, c), got {}", len));
                     }
 
+                    let arg3 = vals.pop().unwrap();
                     let arg2 = vals.pop().unwrap();
                     let arg1 = vals.pop().unwrap();
     
-                    match (arg1, arg2) {
-                        (Vec3(_, _, _), Vec3(_, _, _)) => EvalRet::new(env).with_val(Some(Val::lookat(arg1, arg2))),
-                        (x, y) => report(ErrorType::Runtime, line, format!("Expected lookat(vec3, vec3), got lookat({:?}, {:?})", x, y))
+                    match (arg1, arg2, arg3) {
+                        (Float(fov), Float(near), Float(far)) => EvalRet::new(env).with_val(Some(Val::perspective(fov, near, far))),
+                        (x, y, z) => report(ErrorType::Runtime, line, format!("Expected perspective(float, float, float), got perspective({:?}, {:?}, {:?})", x, y, z))
                     }
                 }
             }

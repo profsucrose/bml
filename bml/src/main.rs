@@ -85,8 +85,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (mut rodeo, ast) = bml::string_to_ast(std::fs::read_to_string(&script)?);
 
-    println!("{:#?}", ast);
-
     let buffer = match &image {
         Some(path) => ImageReader::open(path)?.decode()?.to_rgba8(),
         None => DynamicImage::new_rgba8(width.unwrap() as u32, height.unwrap() as u32).to_rgba8(),

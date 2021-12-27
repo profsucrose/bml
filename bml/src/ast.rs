@@ -291,12 +291,8 @@ impl Val {
                 | (Vec4(_, _, _, _), Vec4(_, _, _, _))
             => Ok(self.zipmap(o, |x, y| x * y)),
 
-            (Float(a), Vec2(_, _))
-                | (Float(a), Vec3(_, _, _))
-                | (Float(a), Vec4(_, _, _, _))
-                | (Vec2(_, _), Float(a))
-                | (Vec3(_, _, _), Float(a))
-                | (Vec4(_, _, _, _), Float(a))
+            (Float(a), Vec2(_, _) | Vec3(_, _, _) | Vec4(_, _, _, _))
+                | (Vec2(_, _) | Vec3(_, _, _) | Vec4(_, _, _, _), Float(a))
             => Ok(o.map(|x| a * x)),
 
             (Float(x), Mat2(col0, col1)) => Ok(Mat2([col0[0] * x, col0[1] * x], [col1[0] * x, col1[1] * x])),
@@ -1181,12 +1177,17 @@ pub fn eval<'a>(&SrcAst { line, ref ast }: &SrcAst, e: Env<'a>, r: &Rodeo) -> Ev
 
             use Val::*;
             EvalRet::new(env).with_val(Some(match (lval, op, rval) {
-                (Float(_), Op::Sub, Vec2(_, _) | Vec3(_, _, _) | Vec4(_, _, _, _))
-                | (Float(_), Op::Add, Vec2(_, _) | Vec3(_, _, _) | Vec4(_, _, _, _))
-                | (Float(_), Op::Mul, Vec2(_, _) | Vec3(_, _, _) | Vec4(_, _, _, _))
-                | (Float(_), Op::Div, Vec2(_, _) | Vec3(_, _, _) | Vec4(_, _, _, _)) => {
-                    // TODO: check this in static analysis pass
-                    report(ErrorType::Runtime, line, "Unexpected float on lhs and vector on rhs")
+                (Float(_), Op::Sub, Vec2(_, _) | Vec3(_, _, _) | Vec4(_, _, _, _)) => {
+                    report(ErrorType::Runtime, line, "Expected vector - float, got float + vector");
+                }
+                (Float(_), Op::Add, Vec2(_, _) | Vec3(_, _, _) | Vec4(_, _, _, _)) => {
+                    report(ErrorType::Runtime, line, "Expected vector + float, got float + vector");
+                }
+                (Float(_), Op::Mul, Vec2(_, _) | Vec3(_, _, _) | Vec4(_, _, _, _)) => {
+                    report(ErrorType::Runtime, line, "Expected vector * float, got float * vector");
+                }
+                (Float(_), Op::Div, Vec2(_, _) | Vec3(_, _, _) | Vec4(_, _, _, _)) => {
+                    report(ErrorType::Runtime, line, "Expected vector / float, got float / vector")
                 }
                 (_, Op::Sub, _) => lval.zipmap(rval, |l, r| l - r),
                 (_, Op::Add, _) => lval.zipmap(rval, |l, r| l + r),

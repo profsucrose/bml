@@ -291,9 +291,9 @@ impl Val {
                 | (Vec4(_, _, _, _), Vec4(_, _, _, _))
             => Ok(self.zipmap(o, |x, y| x * y)),
 
-            (Float(a), Vec2(_, _) | Vec3(_, _, _) | Vec4(_, _, _, _))
-                | (Vec2(_, _) | Vec3(_, _, _) | Vec4(_, _, _, _), Float(a))
-            => Ok(o.map(|x| a * x)),
+            (Float(a), Vec2(_, _) | Vec3(_, _, _) | Vec4(_, _, _, _)) => Ok(o.map(|x| a * x)),
+            
+            (Vec2(_, _) | Vec3(_, _, _) | Vec4(_, _, _, _), Float(a)) => Ok(self.map(|x| x * a)),
 
             (Float(x), Mat2(col0, col1)) => Ok(Mat2([col0[0] * x, col0[1] * x], [col1[0] * x, col1[1] * x])),
             (Float(x), Mat3(col0, col1, col2)) => Ok(Mat3([col0[0] * x, col0[1] * x, col0[2] * x], [col1[0] * x, col1[1] * x, col1[2] * x], [col2[0] * x, col2[1] * x, col2[2] * x])),
@@ -505,12 +505,12 @@ impl Val {
                 | (Vec4(_, _, _, _), Vec4(_, _, _, _), Vec4(_, _, _, _))
             => Ok(self.zipmap3(min, max, |x, y, z| x.clamp(y, z))),
 
-            (Vec2(_, _), Vec2(_, _), Float(a))
-                | (Vec3(_, _, _), Vec3(_, _, _), Float(a))
-                | (Vec4(_, _, _, _), Vec4(_, _, _, _), Float(a))
-            => Ok(self.zipmap3(min, Vec4(a, a, a, a), |x, y, z| x.clamp(y, z))),
+            (Vec2(_, _), Float(min), Float(max))
+                | (Vec3(_, _, _), Float(min), Float(max))
+                | (Vec4(_, _, _, _), Float(min), Float(max))
+            => Ok(self.map(|x| x.clamp(min, max))),
 
-            _ => Err(format!("Expected clamp(float, float, float), clamp(vec2, vec2, vec2), clamp(vec3, vec3, vec3), clamp(vec4, vec4, vec4), got clamp({:?}, {:?}, {:?})", self, min, max))
+            _ => Err(format!("Expected clamp(float, float, float), clamp(vec2, vec2, vec2), clamp(vec3, vec3, vec3), clamp(vec4, vec4, vec4), clamp(vec2, float, float), clamp(vec3, float float), clamp(vec4, float, float), got clamp({:?}, {:?}, {:?})", self, min, max))
         }
     }
 

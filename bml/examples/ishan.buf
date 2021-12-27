@@ -1,0 +1,48 @@
+macro complex_mult(a, b) {
+    give [a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x]
+}
+
+macro complex_abs(complex) {
+    give sqrt(pow(complex.x, 2.0) + pow(complex.y, 2.0))
+}
+
+macro rgb2hsv(c) {
+    K = [0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0]
+    p = mix([c.bg, K.wz], [c.gb, K.xy], step(c.b, c.g))
+    q = mix([p.xyw, c.r], [c.r, p.yzx], step(p.x, c.r))
+
+    d = q.x - min(q.w, q.y);
+    e = 1.0e-10;
+
+    give [abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x]
+}
+
+macro hsv2rgb(c) {
+    K = [1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0]
+    p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www)
+    give mix(K.xxx, clamp(K.xxx - p, 0.0, 1.0), c.y) * c.z
+}
+
+c = coord / resolution
+c = [mix(-2, 0.5, c.x), mix(-1, 1, c.y)] 
+z = [0, 0]
+
+abs = 0
+
+n = 0
+
+while abs <= 10, 100 {
+    abs = complex_abs(z)
+    z = complex_mult(z, z)
+    z = z + c
+    n = n + 1
+}
+
+# n goes till 1000: eg 919, 380, 880 ....
+ # n = n * 999 / 100
+ # return [1-mod(n/100, 10)/10, 1-mod(n/10, 10)/10, 1-mod(n, 10)/10, 1]
+
+n = n * 360 / 100
+veccy = [n, 100, 100]
+colorvec = hsv2rgb(veccy)
+return [colorvec.x, colorvec.y, colorvec.z, 1]

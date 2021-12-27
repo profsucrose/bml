@@ -5,6 +5,9 @@
 *.swo
 *.png
 *.gif
+build
+auth.json
+tmp
 **/.DS_Store
 .vscode
 node_modules

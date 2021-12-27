@@ -1,21 +1,23 @@
 import { App, LogLevel } from '@slack/bolt'
 import axios from 'axios'
-import fs, { createReadStream } from 'fs'
+import * as fs from 'fs'
 import { spawn } from 'child_process'
-import * as dotenv from 'dotenv'
 import { unescape } from 'html-escaper'
-dotenv.config()
+
+const { TOKEN, SIGNING_SECRET } = JSON.parse(fs.readFileSync('auth.json').toString())
 
 const app = new App({
-    token: process.env.TOKEN,
-    signingSecret: process.env.SIGNING_SECRET,
+    token: TOKEN,
+    signingSecret: SIGNING_SECRET,
     logLevel: LogLevel.DEBUG
 })
 
 const CHANNEL_ID = 'C02RJRTK8LV'
-const TMP_IMAGE_DOWNLOAD = 'tmp.png'
-const TMP_BML_OUTPUT = 'out.png'
-const TMP_SCRIPT_DOWNLOAD = 'script.bml'
+const TMP_IMAGE_DOWNLOAD = './tmp/tmp.png'
+const TMP_BML_OUTPUT = './tmp/out.png'
+const TMP_SCRIPT_DOWNLOAD = './tmp/script.bml'
+
+const PORT = 3004
 
 async function downloadImage(url: string) {
     const response = await axios({
@@ -23,7 +25,7 @@ async function downloadImage(url: string) {
         method: 'get',
         responseType: 'stream',
         headers: {
-            Authorization: `Bearer ${process.env.TOKEN}`
+            Authorization: `Bearer ${TOKEN}`
         }
     })
 
@@ -31,7 +33,7 @@ async function downloadImage(url: string) {
 }
 
 async function runBML(): Promise<string> {
-    const bml = spawn('./bml/target/release/bml', [TMP_SCRIPT_DOWNLOAD, TMP_IMAGE_DOWNLOAD])
+    const bml = spawn('../bml/target/release/bml', ['process', TMP_SCRIPT_DOWNLOAD, TMP_IMAGE_DOWNLOAD, '1', TMP_BML_OUTPUT])
 
     return new Promise((resolve, reject) => {
         let output = ''
@@ -76,11 +78,16 @@ async function lastImage(): Promise<string> {
 
 app.message(async ({ message, say }) => {
     const url = await lastImage()
+
+    console.log('DOWNLOAD URL', url)
+
     await downloadImage(url)
 
-    const groups = <string>(message.text).match(/```((.|\n)*?)```/)
+    const groups = <string>(message['text']).match(/```((.|\n)*?)```/)
 
-    let script = groups && groups[1]
+    let script = groups && unescape(groups[1])
+
+    console.log(script)
 
     if (!script) {
         return
@@ -102,7 +109,7 @@ app.message(async ({ message, say }) => {
         app.client.files.upload({
             channels: CHANNEL_ID,
             initial_comment: 'Manipulated image',
-            file: createReadStream(TMP_BML_OUTPUT)
+            file: fs.createReadStream(TMP_BML_OUTPUT)
         })
     } catch (err) {
         say(<string>`Error: \`\`\`${err}\`\`\``)
@@ -110,6 +117,6 @@ app.message(async ({ message, say }) => {
 })
 
 ;(async () => {
-    await app.start(3000)
+    await app.start(PORT)
     console.log(`The Slack app has started!`)
 })()

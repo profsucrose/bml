@@ -294,6 +294,9 @@ impl Val {
             (Float(a), Vec2(_, _))
                 | (Float(a), Vec3(_, _, _))
                 | (Float(a), Vec4(_, _, _, _))
+                | (Vec2(_, _), Float(a))
+                | (Vec3(_, _, _), Float(a))
+                | (Vec4(_, _, _, _), Float(a))
             => Ok(o.map(|x| a * x)),
 
             (Float(x), Mat2(col0, col1)) => Ok(Mat2([col0[0] * x, col0[1] * x], [col1[0] * x, col1[1] * x])),

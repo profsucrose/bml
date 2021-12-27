@@ -525,7 +525,7 @@ impl Val {
             (Vec2(_, _), Vec2(_, _), Float(a))
                 | (Vec3(_, _, _), Vec3(_, _, _), Float(a))
                 | (Vec4(_, _, _, _), Vec4(_, _, _, _), Float(a))
-            => Ok(self.zipmap3(y, Vec4(a, a, a, a), math::mix)),
+            => Ok(self.zipmap(y, |x, y| math::mix(x, y, a))),
 
             _ => Err(format!("Expected mix(float, float, float), mix(vec2, vec2, float), mix(vec3, vec3, float), mix(vec4, vec4, float), mix(vec2, vec2, vec2), mix(vec3, vec3, vec3), mix(vec4, vec4, vec4), got mix({:?}, {:?}. {:?}", self, y, a))
         }

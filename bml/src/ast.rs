@@ -1178,7 +1178,7 @@ pub fn eval<'a>(&SrcAst { line, ref ast }: &SrcAst, e: Env<'a>, r: &Rodeo) -> Ev
             use Val::*;
             EvalRet::new(env).with_val(Some(match (lval, op, rval) {
                 (Float(_), Op::Sub, Vec2(_, _) | Vec3(_, _, _) | Vec4(_, _, _, _)) => {
-                    report(ErrorType::Runtime, line, "Expected vector - float, got float + vector");
+                    report(ErrorType::Runtime, line, "Expected vector - float, got float - vector");
                 }
                 (Float(_), Op::Add, Vec2(_, _) | Vec3(_, _, _) | Vec4(_, _, _, _)) => {
                     report(ErrorType::Runtime, line, "Expected vector + float, got float + vector");

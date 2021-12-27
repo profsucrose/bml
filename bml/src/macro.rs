@@ -4,15 +4,15 @@ use crate::{token::Token, token_type::TokenType};
 
 pub struct Macro {
     keys: Vec<String>,
-    template: Vec<(TokenType, String)>,
+    template: Vec<Token>,
 }
 
 impl Macro {
-    pub fn new(keys: Vec<String>, template: Vec<(TokenType, String)>) -> Macro {
+    pub fn new(keys: Vec<String>, template: Vec<Token>) -> Macro {
         Macro { keys, template }
     }
 
-    pub fn expand(&self, line: usize, args: Vec<Vec<Token>>) -> Vec<Token> {
+    pub fn expand(&self, args: Vec<Vec<Token>>) -> Vec<Token> {
         // dot(a, b)
         let symbols = self
             .keys
@@ -24,9 +24,9 @@ impl Macro {
         self.template
             .clone()
             .into_iter()
-            .flat_map(|(t, s)| match (t, symbols.get(&s)) {
+            .flat_map(|t| match (t.token_type, symbols.get(&t.lexeme)) {
                 (TokenType::Identifier, Some(expansion)) => expansion.clone(),
-                _ => vec![Token::new(t, s, line)],
+                _ => vec![t],
             })
             .collect::<Vec<Token>>()
     }

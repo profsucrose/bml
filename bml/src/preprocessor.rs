@@ -110,13 +110,11 @@ impl PreProcessor {
                             }
 
                             let nested_call = self.tokens[start..self.current].to_owned();
-                            let expansion = self.expand_macro(token.line, &nested_call);
+                            let mut expansion = self.expand_macro(token.line, &nested_call);
 
-                            for t in expansion {
-                                template.push((t.token_type, t.lexeme));
-                            }
+                            template.append(&mut expansion)
                         } else {
-                            template.push((template_token.token_type, template_token.lexeme));
+                            template.push(template_token)
                         }
                     }
 
@@ -293,7 +291,7 @@ impl PreProcessor {
             cursor += 1;
         }
 
-        self.macros.get(&name.lexeme).unwrap().expand(line, args)
+        self.macros.get(&name.lexeme).unwrap().expand(args)
     }
 
     fn at_end(&self) -> bool {

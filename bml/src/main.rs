@@ -1,7 +1,7 @@
 use ast::Val;
 use bml::{
     ast::{self, eval, Sampler},
-    logger::{help, report, success_eval, success_image, ErrorType, render_progress, on_frame},
+    logger::{help, report, success_eval, success_image, ErrorType, render_progress},
 };
 use image::{io::Reader as ImageReader, DynamicImage};
 use rayon::prelude::*;
@@ -143,14 +143,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
+    let progress = Arc::new(Mutex::new(0));
+
     (0..frame_count).for_each(|frame| {
         env.set(rti.frame, Val::Float(frame as _));
 
         let size = (width * height) as usize;
 
-        let progress = Arc::new(Mutex::new(0));
-
-        on_frame(frame + 1, frame_count);
+        let net_pixels = size * frame_count;
 
         let mut frame = (0..thread_count)
             .into_par_iter()
@@ -184,8 +184,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                             *progress += 1;
 
-                            if *progress % (size / 10) == 0 {
-                                let percent = ((*progress as f32) / (size as f32) * 10.0) as usize;
+                            if *progress % (net_pixels / 10) == 0 {
+                                let percent = ((*progress as f32) / (net_pixels as f32) * 10.0) as usize;
                                 render_progress(percent);
                             }
 

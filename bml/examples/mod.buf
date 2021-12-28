@@ -1,0 +1,10 @@
+# mod sawtooth animation
+
+x = coord.x * abs(sin(frame / (frame_count - 1) * 3.14159))
+y = mod(x, 80) + 200
+
+return {
+    give [1, 0, 0, 1]
+} if abs(resolution.y - coord.y - y) < 2 else {
+    give [1; 4]
+}

@@ -1,0 +1,5 @@
+quadrant = abs(coord - resolution/2) / resolution
+
+quadrant = rotate_z(frame / (frame_count - 1) * 3.14159) * [quadrant.x, quadrant.y, 0, 1]
+
+return sample(quadrant.xy * sign(coord) * 2)

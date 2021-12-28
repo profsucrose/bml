@@ -1,11 +1,11 @@
 use ast::Val;
 use bml::{
     ast::{self, eval, Sampler},
-    logger::{help, report, success_eval, success_image, ErrorType},
+    logger::{help, report, success_eval, success_image, ErrorType, render_progress},
 };
 use image::{io::Reader as ImageReader, DynamicImage};
 use rayon::prelude::*;
-use std::{path::Path, process};
+use std::{path::Path, process, sync::{Mutex, Arc}};
 
 macro_rules! gen_runtime_idents {
     ($($x:ident $(,)? )*) => {
@@ -148,10 +148,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let size = (width * height) as usize;
 
+        let progress = Arc::new(Mutex::new(0));
+
         let mut frame = (0..thread_count)
             .into_par_iter()
             .map(|i| {
-                (
+                let result = (
                     i,
                     (size * i / thread_count..size * (i + 1) / thread_count)
                         .flat_map(|index| {
@@ -176,6 +178,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                             let mut ret = ast::eval(&ast, env, &rodeo);
 
+                            let mut progress = progress.lock().unwrap();
+
+                            *progress += 1;
+
+                            if *progress % (size / 10) == 0 {
+                                let percent = ((*progress as f32) / (size as f32) * 10.0) as usize;
+                                render_progress(percent);
+                            }
+
                             match ret.env.ret.take() {
                                 Some(Val::Vec4(r, g, b, a)) => [
                                     (255.0 * r) as u8,
@@ -196,7 +207,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             }
                         })
                         .collect::<Vec<u8>>(),
-                )
+                );
+
+                result
             })
             .collect::<Vec<(usize, Vec<u8>)>>();
 

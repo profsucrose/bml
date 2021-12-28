@@ -16,6 +16,29 @@ pub fn info(message: &str) {
     println!("{}", message);
 }
 
+// from 1-10
+pub fn render_progress(progress: usize) {
+    if progress < 10 {
+        print!(" ");
+    }
+
+    print!("{}", format!("{}% complete: ", progress * 10).yellow().bold());
+    
+    print!("[");
+
+    for i in 1..=10 {
+        if i <= progress {
+            print!("==");
+        } else {
+            print!("  ")
+        }
+    }
+
+    print!("]");
+
+    println!();
+}
+
 pub fn success_eval<S: AsRef<str>>(output: Option<S>) {
     print!("{}", "Returned: ".bold());
 

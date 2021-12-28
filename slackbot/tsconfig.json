@@ -1,17 +1,20 @@
 {
     "compilerOptions": {
         "module": "commonjs",
+        "resolveJsonModule": true,
         "esModuleInterop": true,
         "target": "es6",
         "moduleResolution": "node",
         "sourceMap": true,
         "outDir": "build",
+        "sourceRoot": "src",
         "watch": true
     },
     "lib": [
         "es2017"
     ],
     "include": [
-        "src/"
+        "src/",
+        "auth.json"
     ]
 }

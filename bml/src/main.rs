@@ -1,7 +1,7 @@
 use ast::Val;
 use bml::{
     ast::{self, eval, Sampler},
-    logger::{help, report, success_eval, success_image, ErrorType, render_progress},
+    logger::{help, report, success_eval, success_image, ErrorType, render_progress, on_frame},
 };
 use image::{io::Reader as ImageReader, DynamicImage};
 use rayon::prelude::*;
@@ -149,6 +149,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let size = (width * height) as usize;
 
         let progress = Arc::new(Mutex::new(0));
+
+        on_frame(frame + 1, frame_count);
 
         let mut frame = (0..thread_count)
             .into_par_iter()

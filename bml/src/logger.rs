@@ -16,8 +16,14 @@ pub fn info(message: &str) {
     println!("{}", message);
 }
 
+pub fn on_frame(frame: usize, frame_count: usize) {
+    println!("Rendering frame {}...", format!("{} / {}", frame, frame_count).bold());
+}
+
 // from 1-10
 pub fn render_progress(progress: usize) {
+    print!("  ");
+
     if progress < 10 {
         print!(" ");
     }

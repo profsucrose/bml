@@ -1,0 +1,6 @@
+# generate checkerboard
+
+size = 40
+pos = floor([coord.x / size, coord.y / size])
+
+return [1, 1, 1, 1] if mod(pos.x + mod(pos.y, 2), 2) == 1 else [0, 0, 0, 1]

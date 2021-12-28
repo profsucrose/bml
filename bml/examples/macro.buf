@@ -1,9 +1,0 @@
-# macro testing
-
-macro err() {
-    give 0.5 - [1; 2]
-}
-
-x = err()
-
-return x

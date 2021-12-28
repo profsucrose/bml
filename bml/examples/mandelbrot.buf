@@ -1,50 +1,25 @@
-# testing file
-
-macro while10(cond, loop) {
-    loop if cond else {}
-    loop if cond else {}
-    loop if cond else {}
-    loop if cond else {}
-    loop if cond else {}
-    loop if cond else {}
-    loop if cond else {}
-    loop if cond else {}
-    loop if cond else {}
-    loop if cond else {}
-}
-
-macro while69(cond, loop) {
-    while10(cond, loop)
-    while10(cond, loop)
-    while10(cond, loop)
-    while10(cond, loop)
-    while10(cond, loop)
-    while10(cond, loop)
-    loop if cond else {}
-    loop if cond else {}
-    loop if cond else {}
-    loop if cond else {}
-    loop if cond else {}
-    loop if cond else {}
-    loop if cond else {}
-    loop if cond else {}
-    loop if cond else {}
-}
-
-macro and(a, b) a * b
-
 macro complex_mult(a, b) {
     give [a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x]
 }
 
+macro complex_abs(complex) {
+    give sqrt(pow(complex.x, 2.0) + pow(complex.y, 2.0))
+}
+
+c = coord / resolution
+c = [mix(-2, 2, c.x), mix(-1, 1, c.y)] 
 
 z = [0, 0]
-c = [0.2, 0.2]
 
-i = 0
-while69(i < 50, {
-})
+abs = 0
 
-col = [0, 1, 0, 1] if and(z.x > 10, z.y > 10) else [0, 0, 0, 1]
+n = 0
 
-return col
+while abs <= 2, 100 {
+    abs = complex_abs(z)
+    z = complex_mult(z, z) + c
+    n = n + 1
+}
+
+col = n / 100
+return [col, col, col, 1]

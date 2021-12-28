@@ -1,2 +1,0 @@
-col = frame / frame_count
-return [col, col, col, 1]

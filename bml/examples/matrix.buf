@@ -1,4 +1,0 @@
-mat = scale(5.0)
-position = [1, 2, 3, 0]
-
-return mat * position

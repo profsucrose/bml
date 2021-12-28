@@ -1,9 +1,1 @@
-# draw black vignette that gets smaller each frame
-
-uv = coord / resolution
-
-distance = dist(uv, [0.5, 0.5])
-
-color = sin(uv + frame / frame_count)
-
-return [color.x, color.y, 1, 1]
+return frag * (dist(coord / resolution, [0.5, 0.5]) < (1.0 - frame / (frame_count - 1)))

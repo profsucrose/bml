@@ -7,6 +7,54 @@ use crate::{
     token_type::TokenType,
 };
 
+#[derive(Default)]
+pub struct Arg {
+    parens: usize,
+    square_brackets: usize,
+    brackets: usize,
+    pub lexeme: Vec<Token>,
+}
+
+impl Arg {
+    pub fn is_closed(&self) -> bool {
+        self.parens == 0 && self.brackets == 0 && self.square_brackets == 0
+    }
+
+    pub fn new_token(&mut self, token: Token) -> Result<(), &str> {
+        match token.token_type {
+            TokenType::LeftParen => self.parens += 1,
+            TokenType::RightParen => {
+                if self.parens == 0 {
+                    return Err("Unexpected ')' in macro arguments");
+                } else {
+                    self.parens -= 1
+                }
+            },
+            TokenType::LeftBracket => self.brackets += 1,
+            TokenType::RightBracket => {
+                if self.brackets == 0 {
+                    return Err("Unexpected '}' in macro arguments");
+                } else {
+                    self.brackets -= 1
+                }
+            },
+            TokenType::LeftSquare => self.square_brackets += 1,
+            TokenType::RightSquare => {
+                if self.square_brackets == 0 {
+                    return Err("Unexpected ']' in macro arguments");
+                } else {
+                    self.square_brackets -= 1
+                }
+            },
+            _ => {}
+        }
+
+        self.lexeme.push(token);
+
+        Ok(())
+    }
+}
+
 pub struct PreProcessor {
     tokens: Vec<Token>,
     result: Vec<Token>,
@@ -81,7 +129,17 @@ impl PreProcessor {
 
                         match template_token.token_type {
                             TokenType::LeftBracket => brackets += 1,
-                            TokenType::RightBracket => brackets -= 1,
+                            TokenType::RightBracket => {
+                                if brackets == 0 {
+                                    report(
+                                        ErrorType::Preprocessor,
+                                        self.peek().line,
+                                        "Unexpected '}'",
+                                    )
+                                }
+
+                                brackets -= 1
+                            }
                             _ => {}
                         };
 
@@ -106,7 +164,11 @@ impl PreProcessor {
                             }
 
                             if parens > 0 {
-                                report(ErrorType::Preprocessor, self.previous().line, "Expected ')' in macro definition");
+                                report(
+                                    ErrorType::Preprocessor,
+                                    self.previous().line,
+                                    "Expected ')' in macro definition",
+                                );
                             }
 
                             let nested_call = self.tokens[start..self.current].to_owned();
@@ -182,28 +244,45 @@ impl PreProcessor {
         let name = match call.get(0) {
             Some(token) => {
                 if token.token_type != TokenType::Identifier {
-                    report(ErrorType::Preprocessor, token.line, format!( "Expected macro call to start with identifier, got '{:?}'", token.lexeme) .as_str());
+                    report(
+                        ErrorType::Preprocessor,
+                        token.line,
+                        format!(
+                            "Expected macro call to start with identifier, got '{:?}'",
+                            token.lexeme
+                        )
+                        .as_str(),
+                    );
                 }
 
                 token
             }
             None => {
-                report(ErrorType::Preprocessor, line, "Expected macro call to have non-zero length");
+                report(
+                    ErrorType::Preprocessor,
+                    line,
+                    "Expected macro call to have non-zero length",
+                );
             }
         };
 
         match call.get(1) {
-            Some(Token { token_type: TokenType::LeftParen, ..  }) => {}
+            Some(Token {
+                token_type: TokenType::LeftParen,
+                ..
+            }) => {}
             _ => {
-                report(ErrorType::Preprocessor, line, "Expected '(' in macro invocation");
+                report(
+                    ErrorType::Preprocessor,
+                    line,
+                    "Expected '(' in macro invocation",
+                );
             }
         }
 
         let mut cursor = 2;
-        let mut current_arg = Vec::new();
+        let mut current_arg = Arg::default();
         let mut args = Vec::new();
-
-        let mut parens = 1;
 
         loop {
             match call.get(cursor) {
@@ -211,42 +290,31 @@ impl PreProcessor {
                     report(ErrorType::Preprocessor, line, "Expected ')' in macro call");
                 }
                 Some(token) => {
-                    match token {
-                        Token {
-                            token_type: TokenType::RightParen,
-                            ..
-                        } => {
-                            parens -= 1;
-                            if parens == 0 {
-                                // closing paren, not part of arg
-                                if !current_arg.is_empty() {
-                                    // move current_arg as should no longer be used
-                                    args.push(current_arg);
+                    let mut is_arg_comma = false;
+
+                    match token.token_type {
+                        TokenType::Comma => {
+                            if current_arg.is_closed() {
+                                if current_arg.lexeme.is_empty() {
+                                    report(ErrorType::Preprocessor, line, "Unexpected ',' in macro arguments");
+                                }
+
+                                args.push(current_arg.lexeme);
+                                current_arg = Arg::default();
+
+                                is_arg_comma = true;
+                            }
+                        }
+                        TokenType::RightParen => {
+                            if current_arg.is_closed() {
+                                if !current_arg.lexeme.is_empty() {
+                                    args.push(current_arg.lexeme);
                                 }
 
                                 break;
-                            } else {
-                                current_arg.push(token.clone());
                             }
                         }
-                        Token {
-                            token_type: TokenType::LeftParen,
-                            ..
-                        } => {
-                            parens += 1;
-                            current_arg.push(token.clone());
-                        }
-                        Token {
-                            token_type: TokenType::Comma,
-                            ..
-                        } => {
-                            args.push(current_arg.clone());
-                            current_arg.clear();
-                        }
-                        Token {
-                            token_type: TokenType::Identifier,
-                            ..
-                        } => {
+                        TokenType::Identifier => {
                             if self.macros.contains_key(&token.lexeme) {
                                 let start = cursor;
 
@@ -257,8 +325,8 @@ impl PreProcessor {
                                             ..
                                         }) => {
                                             cursor += 1;
-                                            break
-                                        },
+                                            break;
+                                        }
                                         None => {
                                             report(
                                                 ErrorType::Preprocessor,
@@ -273,19 +341,21 @@ impl PreProcessor {
                                 let nested_call = call[start..cursor].to_owned();
                                 let mut expansion = self.expand_macro(token.line, &nested_call);
 
-                                current_arg.append(&mut expansion);
+                                current_arg.lexeme.append(&mut expansion);
 
                                 // cursor is already incremented
-                                continue
-                            } else {
-                                current_arg.push(token.clone());
+                                continue;
                             }
                         }
-                        _ => {
-                            current_arg.push(token.clone());
+                        _ => {}
+                    }
+
+                    if !is_arg_comma {
+                        if let Err(error) = current_arg.new_token(token.clone()) {
+                            report(ErrorType::Preprocessor, line, error);
                         }
                     }
-                }
+               }
             }
 
             cursor += 1;

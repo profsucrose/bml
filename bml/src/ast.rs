@@ -93,6 +93,15 @@ mod math {
     }
 }
 
+macro_rules! vector_map {
+    ($self:ident, $name:expr, $op:expr) => {{
+        if !$self.is_vector_or_scalar() {
+            return Err(format!("Expected {}(float) or {}(vector), got radians({:?})", $name, $name, $self))
+        }
+        Ok($self.map($op))
+    }};
+}
+
 impl Val {
     pub fn float(self) -> Option<f32> {
         match self {
@@ -120,18 +129,17 @@ impl Val {
         }
     }
 
-    pub fn zipmap3<F: FnMut(f32, f32, f32) -> f32>(self, o1: Self, o2: Self, mut f: F) -> Val {
+    pub fn zipmap3<F: FnMut(f32, f32, f32) -> f32>(self, o1: Self, o2: Self, mut f: F) -> Result<Val, String> {
         match (self, o1, o2) {
-            (Float(x), Float(y), Float(z)) => Float(f(x, y, z)),
-            (Vec2(x0, x1), Vec2(y0, y1), Vec2(z0, z1)) => Vec2(f(x0, y0, z0), f(x1, y1, z1)),
+            (Float(x), Float(y), Float(z)) => Ok(Float(f(x, y, z))),
+            (Vec2(x0, x1), Vec2(y0, y1), Vec2(z0, z1)) => Ok(Vec2(f(x0, y0, z0), f(x1, y1, z1))),
             (Vec3(x0, x1, x2), Vec3(y0, y1, y2), Vec3(z0, z1, z2)) => {
-                Vec3(f(x0, y0, z0), f(x1, y1, z1), f(x2, y2, z2))
+                Ok(Vec3(f(x0, y0, z0), f(x1, y1, z1), f(x2, y2, z2)))
             }
             (Vec4(x0, x1, x2, x3), Vec4(y0, y1, y2, y3), Vec4(z0, z1, z2, z3)) => {
-                Vec4(f(x0, y0, z0), f(x1, y1, z1), f(x2, y2, z2), f(x3, y3, z3))
+                Ok(Vec4(f(x0, y0, z0), f(x1, y1, z1), f(x2, y2, z2), f(x3, y3, z3)))
             }
-            _ => panic!(
-                "{}",
+            _ => Err(
                 format!(
                     "expected all args to zipmap3 be vectors of the same type, got {:?}, {:?}, {:?}",
                     self, o1, o2
@@ -140,57 +148,57 @@ impl Val {
         }
     }
 
-    pub fn zipmap<F: FnMut(f32, f32) -> f32>(self, o: Self, mut f: F) -> Val {
+    pub fn zipmap<F: FnMut(f32, f32) -> f32>(self, o: Self, mut f: F) -> Result<Val, String> {
         match (self, o) {
-            (Float(l), Float(r)) => Float(f(l, r)),
-            (Vec2(lx, ly), Float(r)) => Vec2(f(lx, r), f(ly, r)),
-            (Vec3(lx, ly, lz), Float(r)) => Vec3(f(lx, r), f(ly, r), f(lz, r)),
-            (Vec4(lx, ly, lz, lw), Float(r)) => Vec4(f(lx, r), f(ly, r), f(lz, r), f(lw, r)),
+            (Float(l), Float(r)) => Ok(Float(f(l, r))),
+            (Vec2(lx, ly), Float(r)) => Ok(Vec2(f(lx, r), f(ly, r))),
+            (Vec3(lx, ly, lz), Float(r)) => Ok(Vec3(f(lx, r), f(ly, r), f(lz, r))),
+            (Vec4(lx, ly, lz, lw), Float(r)) => Ok(Vec4(f(lx, r), f(ly, r), f(lz, r), f(lw, r))),
 
-            (Float(r), Vec2(lx, ly)) => Vec2(f(r, lx), f(r, ly)),
-            (Float(r), Vec3(lx, ly, lz)) => Vec3(f(r, lx), f(r, ly), f(r, lz)),
-            (Float(r), Vec4(lx, ly, lz, lw)) => Vec4(f(r, lx), f(r, ly), f(r, lz), f(r, lw)),
+            (Float(r), Vec2(lx, ly)) => Ok(Vec2(f(r, lx), f(r, ly))),
+            (Float(r), Vec3(lx, ly, lz)) => Ok(Vec3(f(r, lx), f(r, ly), f(r, lz))),
+            (Float(r), Vec4(lx, ly, lz, lw)) => Ok(Vec4(f(r, lx), f(r, ly), f(r, lz), f(r, lw))),
 
-            (Vec2(lx, ly), Vec2(rx, ry)) => Vec2(f(lx, rx), f(ly, ry)),
-            (Vec3(lx, ly, lz), Vec3(rx, ry, rz)) => Vec3(f(lx, rx), f(ly, ry), f(lz, rz)),
+            (Vec2(lx, ly), Vec2(rx, ry)) => Ok(Vec2(f(lx, rx), f(ly, ry))),
+            (Vec3(lx, ly, lz), Vec3(rx, ry, rz)) => Ok(Vec3(f(lx, rx), f(ly, ry), f(lz, rz))),
             (Vec4(lx, ly, lz, lw), Vec4(rx, ry, rz, rw)) => {
-                Vec4(f(lx, rx), f(ly, ry), f(lz, rz), f(lw, rw))
+                Ok(Vec4(f(lx, rx), f(ly, ry), f(lz, rz), f(lw, rw)))
             }
 
-            _ => panic!("Unexpected relationship between scalars, vectors or matrices in operation")
+            (x, y) => Err(format!("Expected float `op` float, vector `op` float, float `op` vector, or same-size vector `op` vector, got {:?} `op` {:?}", x, y))
         }
     }
 
-    pub fn get_field(&self, f: Field) -> f32 {
+    pub fn get_field(&self, f: Field) -> Result<f32, String> {
         use Val::*;
         match f {
             Field::X => match *self {
-                Float(_) => panic!("Float has no x field"),
-                Vec2(x, _) => x,
-                Vec3(x, _, _) => x,
-                Vec4(x, _, _, _) => x,
-                _ => panic!("Tried to swizzle matrix"),
+                Float(_) => Err("Tried to get swizzle float".to_string()),
+                Vec2(x, _) => Ok(x),
+                Vec3(x, _, _) => Ok(x),
+                Vec4(x, _, _, _) => Ok(x),
+                x => Err(format!("Expecting vector when swizzling `x` / `r` field, got {:?}", x))
             },
             Field::Y => match *self {
-                Float(_) => panic!("Float has no y field"),
-                Vec2(_, y) => y,
-                Vec3(_, y, _) => y,
-                Vec4(_, y, _, _) => y,
-                _ => panic!("Tried to swizzle matrix"),
+                Float(_) => Err("Tried to get swizzle float".to_string()),
+                Vec2(_, y) => Ok(y),
+                Vec3(_, y, _) => Ok(y),
+                Vec4(_, y, _, _) => Ok(y),
+                x => Err(format!("Expecting vector when swizzling `y` / `g` field, got {:?}", x))
             },
             Field::Z => match *self {
-                Float(_) => panic!("Float has no z field"),
-                Vec2(_, _) => panic!("Vec2 has no z field"),
-                Vec3(_, _, z) => z,
-                Vec4(_, _, z, _) => z,
-                _ => panic!("Tried to swizzle matrix"),
+                Float(_) => Err("Tried to get swizzle float".to_string()),
+                Vec2(_, _) => Err("Tried to get `z` / `b` field from vec2".to_string()),
+                Vec3(_, _, z) => Ok(z),
+                Vec4(_, _, z, _) => Ok(z),
+                x => Err(format!("Expecting vector when swizzling `z` / `b` field, got {:?}", x))
             },
             Field::W => match *self {
-                Float(_) => panic!("Float has no w field"),
-                Vec2(_, _) => panic!("Vec2 has no w field"),
-                Vec3(_, _, _) => panic!("Vec3 has no w field"),
-                Vec4(_, _, _, w) => w,
-                _ => panic!("Tried to swizzle matrix"),
+                Float(_) => Err("Tried to get swizzle float".to_string()),
+                Vec2(_, _) => Err("vec2 has no `w` / `a` field".to_string()),
+                Vec3(_, _, _) => Err("vec3 has no `w` / `a` field".to_string()),
+                Vec4(_, _, _, w) => Ok(w),
+                x => Err(format!("Expecting vector when swizzling `w` / `a` field, got {:?}", x))
             },
         }
     }
@@ -273,19 +281,36 @@ impl Val {
         )
     }
 
-    pub fn lookat(from: Val, to: Val) -> Val {
+    pub fn lookat(&self, /* from */ to: Self) -> Result<Val, String> {
+        match (self, to) {
+            (Vec3(_, _, _), Vec3(_, _, _)) => {},
+            (x, y) => return Err(format!("Expected lookat(vec3, vec3), got lookat({:?}, {:?})", x, y))
+        }
+
         let up = Vec3(0.0, 1.0, 0.0);
-        let forward = from.zipmap(to, |l, r| l -r).norm();
-        let right = up.norm().cross(forward).unwrap();
+        let forward = self.sub(to)?.norm()?;
+        let right = up.norm()?.cross(forward).unwrap();
 
         // center row is up-axis Vec3(0, 1, 0)
 
-        Mat4(
-            [right.get_field(Field::X), 0.0, forward.get_field(Field::X), from.get_field(Field::X)],
-            [right.get_field(Field::Y), 1.0, forward.get_field(Field::Y), from.get_field(Field::Y)],
-            [right.get_field(Field::Z), 0.0, forward.get_field(Field::Z), from.get_field(Field::Z)],
+        Ok(Mat4(
+            [right.get_field(Field::X)?, 0.0, forward.get_field(Field::X)?, self.get_field(Field::X)?],
+            [right.get_field(Field::Y)?, 1.0, forward.get_field(Field::Y)?, self.get_field(Field::Y)?],
+            [right.get_field(Field::Z)?, 0.0, forward.get_field(Field::Z)?, self.get_field(Field::Z)?],
             [                      0.0, 0.0,                         0.0,                      1.0]
-        )
+        ))
+    }
+
+    pub fn add(&self, o: Self) -> Result<Val, String> {
+        self.zipmap(o, |x, y| x + y)
+    }
+
+    pub fn sub(&self, o: Self) -> Result<Val, String> {
+        self.zipmap(o, |x, y| x - y)
+    }
+    
+    pub fn div(&self, o: Self) -> Result<Val, String> {
+        self.zipmap(o, |x, y| x / y)
     }
 
     pub fn mult(&self, o: Self) -> Result<Val, String> {
@@ -294,7 +319,7 @@ impl Val {
                 | (Vec2(_, _), Vec2(_, _))
                 | (Vec3(_, _, _), Vec3(_, _, _))
                 | (Vec4(_, _, _, _), Vec4(_, _, _, _))
-            => Ok(self.zipmap(o, |x, y| x * y)),
+            => self.zipmap(o, |x, y| x * y),
 
             (Float(a), Vec2(_, _) | Vec3(_, _, _) | Vec4(_, _, _, _)) => Ok(o.map(|x| a * x)),
             
@@ -370,72 +395,79 @@ impl Val {
         }
     }
 
-    pub fn radians(&self) -> Val {
-        self.map(math::rad)
+    pub fn is_vector_or_scalar(&self) -> bool {
+        match self {
+            Float(_) | Vec2(_, _) | Vec3(_, _, _) | Vec4(_, _, _, _) => true,
+            _ => false
+        }
     }
 
-    pub fn degrees(&self) -> Val {
-        self.map(math::deg)
+    pub fn radians(&self) -> Result<Val, String> {
+        vector_map!(self, "radians", math::rad)
     }
 
-    pub fn sin(&self) -> Val {
-        self.map(f32::sin)
+    pub fn degrees(&self) -> Result<Val, String> {
+        vector_map!(self, "degrees", math::deg)
     }
 
-    pub fn cos(&self) -> Val {
-        self.map(f32::cos)
+    pub fn sin(&self) -> Result<Val, String> {
+        vector_map!(self, "sin", f32::sin)
     }
 
-    pub fn tan(&self) -> Val {
-        self.map(f32::tan)
+    pub fn cos(&self) -> Result<Val, String> {
+        vector_map!(self, "cos", f32::cos)
     }
 
-    pub fn asin(&self) -> Val {
-        self.map(f32::asin)
+    pub fn tan(&self) -> Result<Val, String> {
+        vector_map!(self, "tan", f32::tan)
     }
 
-    pub fn acos(&self) -> Val {
-        self.map(f32::acos)
+    pub fn asin(&self) -> Result<Val, String> {
+        vector_map!(self, "asin", f32::asin)
     }
 
-    pub fn atan(&self) -> Val {
-        self.map(f32::atan)
+    pub fn acos(&self) -> Result<Val, String> {
+        vector_map!(self, "acos", f32::acos)
     }
 
-    pub fn exp(&self) -> Val {
-        self.map(f32::exp)
+    pub fn atan(&self) -> Result<Val, String> {
+        vector_map!(self, "atan", f32::atan)
     }
 
-    pub fn log(&self) -> Val {
-        self.map(|x| f32::log(std::f32::consts::E, x))
+    pub fn exp(&self) -> Result<Val, String> {
+        vector_map!(self, "exp", f32::exp)
     }
 
-    pub fn sqrt(&self) -> Val {
-        self.map(f32::sqrt)
+    pub fn log(&self) -> Result<Val, String> {
+        vector_map!(self, "log", |x| f32::log(std::f32::consts::E, x))
     }
 
-    pub fn invsqrt(&self) -> Val {
-        self.map(math::inv_sqrt)
+    pub fn sqrt(&self) -> Result<Val, String> {
+        vector_map!(self, "sqrt", f32::sqrt)
     }
 
-    pub fn abs(&self) -> Val {
-        self.map(f32::abs)
+    pub fn invsqrt(&self) -> Result<Val, String> {
+        vector_map!(self, "invsqrt", math::inv_sqrt)
     }
 
-    pub fn sign(&self) -> Val {
-        self.map(f32::signum)
+    pub fn abs(&self) -> Result<Val, String> {
+        vector_map!(self, "abs", f32::abs)
     }
 
-    pub fn floor(&self) -> Val {
-        self.map(f32::floor)
+    pub fn sign(&self) -> Result<Val, String> {
+        vector_map!(self, "sign", f32::signum)
     }
 
-    pub fn ceil(&self) -> Val {
-        self.map(f32::ceil)
+    pub fn floor(&self) -> Result<Val, String> {
+        vector_map!(self, "floor", f32::floor)
     }
 
-    pub fn fract(&self) -> Val {
-        self.map(f32::fract)
+    pub fn ceil(&self) -> Result<Val, String> {
+        vector_map!(self, "ceil", f32::ceil)
+    }
+
+    pub fn fract(&self) -> Result<Val, String> {
+        vector_map!(self, "fract", f32::fract)
     }
 
     pub fn pow(&self, exp: Self) -> Result<Val, String> {
@@ -444,7 +476,7 @@ impl Val {
                 | (Vec2(_, _), Vec2(_, _))
                 | (Vec3(_, _, _), Vec3(_, _, _))
                 | (Vec4(_, _, _, _), Vec4(_, _, _, _))
-            => Ok(self.zipmap(exp, |x, exp| x.powf(exp))),
+            => self.zipmap(exp, |x, exp| x.powf(exp)),
 
             (Vec2(_, _), Float(exp))
                 | (Vec3(_, _, _), Float(exp))
@@ -475,7 +507,7 @@ impl Val {
                 | (Vec2(_, _), Vec2(_, _))
                 | (Vec3(_, _, _), Vec3(_, _, _))
                 | (Vec4(_, _, _, _), Vec4(_, _, _, _))
-            => Ok(self.zipmap(o, |x, y| x % y)),
+            => Ok(self.zipmap(o, |x, y| x % y)?),
             _ => Err(format!("Expected mod(float, float), mod(vec2, vec2), mod(vec3, vec3), mod(vec4, vec4), got mod({:?}, {:?})", self, o))
         }
     }
@@ -486,7 +518,7 @@ impl Val {
                 | (Vec2(_, _), Vec2(_, _))
                 | (Vec3(_, _, _), Vec3(_, _, _))
                 | (Vec4(_, _, _, _), Vec4(_, _, _, _))
-            => Ok(self.zipmap(val, |x, y| x.min(y))),
+            => Ok(self.zipmap(val, |x, y| x.min(y))?),
             _ => Err(format!("Expected min(float, float), min(vec2, vec2), min(vec3, vec3), min(vec4, vec4), got min({:?}, {:?})", self, val))
         }
     }
@@ -497,7 +529,7 @@ impl Val {
                 | (Vec2(_, _), Vec2(_, _))
                 | (Vec3(_, _, _), Vec3(_, _, _))
                 | (Vec4(_, _, _, _), Vec4(_, _, _, _))
-            => Ok(self.zipmap(val, |x, y| x.max(y))),
+            => Ok(self.zipmap(val, |x, y| x.max(y))?),
             _ => Err(format!("Expected max(float, float), max(vec2, vec2), max(vec3, vec3), max(vec4, vec4), got max({:?}, {:?})", self, val))
         }
     }
@@ -508,7 +540,7 @@ impl Val {
                 | (Vec2(_, _), Vec2(_, _), Vec2(_, _))
                 | (Vec3(_, _, _), Vec3(_, _, _), Vec3(_, _, _))
                 | (Vec4(_, _, _, _), Vec4(_, _, _, _), Vec4(_, _, _, _))
-            => Ok(self.zipmap3(min, max, |x, y, z| x.clamp(y, z))),
+            => Ok(self.zipmap3(min, max, |x, y, z| x.clamp(y, z))?),
 
             (Vec2(_, _), Float(min), Float(max))
                 | (Vec3(_, _, _), Float(min), Float(max))
@@ -525,12 +557,12 @@ impl Val {
                 | (Vec2(_, _), Vec2(_, _), Vec2(_, _))
                 | (Vec3(_, _, _), Vec3(_, _, _), Vec3(_, _, _))
                 | (Vec4(_, _, _, _), Vec4(_, _, _, _), Vec4(_, _, _, _))
-            => Ok(self.zipmap3(y, a, math::mix)),
+            => Ok(self.zipmap3(y, a, math::mix)?),
 
             (Vec2(_, _), Vec2(_, _), Float(a))
                 | (Vec3(_, _, _), Vec3(_, _, _), Float(a))
                 | (Vec4(_, _, _, _), Vec4(_, _, _, _), Float(a))
-            => Ok(self.zipmap(y, |x, y| math::mix(x, y, a))),
+            => Ok(self.zipmap(y, |x, y| math::mix(x, y, a))?),
 
             _ => Err(format!("Expected mix(float, float, float), mix(vec2, vec2, float), mix(vec3, vec3, float), mix(vec4, vec4, float), mix(vec2, vec2, vec2), mix(vec3, vec3, vec3), mix(vec4, vec4, vec4), got mix({:?}, {:?}. {:?}", self, y, a))
         }
@@ -542,7 +574,7 @@ impl Val {
                 | (Vec2(_, _), Vec2(_, _))
                 | (Vec3(_, _, _), Vec3(_, _, _))
                 | (Vec4(_, _, _, _), Vec4(_, _, _, _))
-            => Ok(self.zipmap(x, |edge, x| if x < edge { 0.0 } else { 1.0 })),
+            => Ok(self.zipmap(x, |edge, x| if x < edge { 0.0 } else { 1.0 })?),
 
             (Float(a), Vec2(_, _))
                 | (Float(a), Vec3(_, _, _))
@@ -553,17 +585,34 @@ impl Val {
         }
     }
 
-    pub fn length(&self) -> Val {
+    pub fn smoothstep(&self, edge1: Self, x: Self) -> Result<Val, String> {
+        match (self, edge1, x) {
+            (Float(_), Float(_), Float(_))
+                | (Vec2(_, _), Vec2(_, _), Vec2(_, _))
+                | (Vec3(_, _, _), Vec3(_, _, _), Vec3(_, _, _))
+                | (Vec4(_, _, _, _), Vec4(_, _, _, _), Vec4(_, _, _, _))
+                | (Float(_), Float(_), Vec2(_, _))
+                | (Float(_), Float(_), Vec3(_, _, _))
+                | (Float(_), Float(_), Vec4(_, _, _, _))
+            => {
+                let t = x.sub(*self)?.div(edge1.sub(*self)?)?.clamp(Float(0.0), Float(1.0))?;
+                t.mult(t)?.mult(Float(3.0).sub(Float(2.0).mult(t)?)?)
+            }
+            (x, y, z) => Err(format!("Expected smoothstep(float, float, float), smoothstep(vec2, vec2, vec2), smoothstep(vec3, vec3, vec3), smoothstep(vec4, vec4, vec4), smoothstep(float, float, vec2), smoothstep(float, float, vec3), smoothstep(float, float, vec4), got smoothstep({:?}, {:?}, {:?})", x, y, z))
+        }
+    }
+
+    pub fn length(&self) -> Result<Val, String> {
         let sum = match self.map(|x| x.powi(2)) {
             Float(x) => x,
             Vec2(x, y) => x + y,
             Vec3(x, y, z) => x + y + z,
             Vec4(x, y, z, w) => x + y + z + w,
 
-            _ => panic!("Tried to get length of matrix"),
+            x => return Err(format!("Expected length(float), length(vec2), length(vec3), length(vec4), got length({:?})", x))
         };
 
-        Float(sum.sqrt())
+        Ok(Float(sum.sqrt()))
     }
 
     pub fn dist(&self, o: Self) -> Result<Val, String> {
@@ -572,7 +621,7 @@ impl Val {
                 | (Vec2(_, _), Vec2(_, _))
                 | (Vec3(_, _, _), Vec3(_, _, _))
                 | (Vec4(_, _, _, _), Vec4(_, _, _, _))
-            => Ok(self.zipmap(o, |x, y| x - y).length()),
+            => self.zipmap(o, |x, y| x - y)?.length(),
             _ => Err(format!("Expected dist(float, float), dist(vec2, vec2), dist(vec3, vec3), dist(vec4, vec4), got dist({:?}, {:?})", self, o))
         }
     }
@@ -591,8 +640,8 @@ impl Val {
         }
     }
 
-    pub fn norm(&self) -> Val {
-        self.zipmap(self.length(), |x, len| x / len)
+    pub fn norm(&self) -> Result<Val, String> {
+        self.zipmap(self.length()?, |x, len| x / len)
     }
 }
 
@@ -934,7 +983,10 @@ macro_rules! builtin_one_arg {
             )
         }
 
-        EvalRet::new($env).with_val(Some($op(&$vals.pop().unwrap())))
+        match $op(&$vals.pop().unwrap()) {
+            Ok(result) =>  EvalRet::new($env).with_val(Some(result)),
+            Err(error) => report(ErrorType::Runtime, $line, error)
+        }
     }};
 }
 
@@ -1142,16 +1194,46 @@ pub fn eval<'a>(&SrcAst { line, ref ast }: &SrcAst, e: Env<'a>, r: &Rodeo) -> Ev
             }
 
             EvalRet::new(env).with_val(Some(match *swiz {
-                Swizzle(x, None, None, None) => Val::Float(val.get_field(x)),
-                Swizzle(x, Some(y), None, None) => Val::Vec2(val.get_field(x), val.get_field(y)),
+                Swizzle(x, None, None, None) => Val::Float(match val.get_field(x) {
+                    Ok(result) => result,
+                    Err(error) => report(ErrorType::Runtime, line, error)
+                }),
+                Swizzle(x, Some(y), None, None) => Val::Vec2(match val.get_field(x) {
+                    Ok(result) => result,
+                    Err(error) => report(ErrorType::Runtime, line, error)
+                }, match val.get_field(y) {
+                    Ok(result) => result,
+                    Err(error) => report(ErrorType::Runtime, line, error)
+                }),
                 Swizzle(x, Some(y), Some(z), None) => {
-                    Val::Vec3(val.get_field(x), val.get_field(y), val.get_field(z))
+                    Val::Vec3(match val.get_field(x) {
+                        Ok(result) => result,
+                        Err(error) => report(ErrorType::Runtime, line, error)
+                    }, match val.get_field(y) {
+                        Ok(result) => result,
+                        Err(error) => report(ErrorType::Runtime, line, error)
+                    }, match val.get_field(z) {
+                        Ok(result) => result,
+                        Err(error) => report(ErrorType::Runtime, line, error)
+                    })
                 }
                 Swizzle(x, Some(y), Some(z), Some(w)) => Val::Vec4(
-                    val.get_field(x),
-                    val.get_field(y),
-                    val.get_field(z),
-                    val.get_field(w),
+                    match val.get_field(x) {
+                        Ok(result) => result,
+                        Err(error) => report(ErrorType::Runtime, line, error)
+                    },
+                    match val.get_field(y) {
+                        Ok(result) => result,
+                        Err(error) => report(ErrorType::Runtime, line, error)
+                    },
+                    match val.get_field(z) {
+                        Ok(result) => result,
+                        Err(error) => report(ErrorType::Runtime, line, error)
+                    },
+                    match val.get_field(w) {
+                        Ok(result) => result,
+                        Err(error) => report(ErrorType::Runtime, line, error)
+                    },
                 ),
                 _ => report(ErrorType::Runtime, line, "Invalid swizzle"),
             }))
@@ -1182,13 +1264,22 @@ pub fn eval<'a>(&SrcAst { line, ref ast }: &SrcAst, e: Env<'a>, r: &Rodeo) -> Ev
 
             use Val::*;
             EvalRet::new(env).with_val(Some(match (lval, op, rval) {
-                (_, Op::Sub, _) => lval.zipmap(rval, |l, r| l - r),
-                (_, Op::Add, _) => lval.zipmap(rval, |l, r| l + r),
+                (_, Op::Sub, _) => match lval.sub(rval) {
+                    Ok(result) => result,
+                    Err(error) => report(ErrorType::Runtime, line, error)
+                },
+                (_, Op::Add, _) => match lval.add(rval) {
+                    Ok(result) => result,
+                    Err(error) => report(ErrorType::Runtime, line, error)
+                },
                 (_, Op::Mul, _) => match lval.mult(rval) {
                     Ok(result) => result,
-                    Err(error) => report(ErrorType::Runtime, line, error.as_str())
+                    Err(error) => report(ErrorType::Runtime, line, error)
                 }
-                (_, Op::Div, _) => lval.zipmap(rval, |l, r| l / r),
+                (_, Op::Div, _) => match lval.div(rval) {
+                    Ok(result) => result,
+                    Err(error) => report(ErrorType::Runtime, line, error)
+                },
                 (Float(l), Op::More, Float(r)) => Float((l > r) as i32 as f32),
                 (Float(l), Op::Less, Float(r)) => Float((l < r) as i32 as f32),
                 (Float(l), Op::MoreEq, Float(r)) => Float((l >= r) as i32 as f32),
@@ -1506,18 +1597,8 @@ pub fn eval<'a>(&SrcAst { line, ref ast }: &SrcAst, e: Env<'a>, r: &Rodeo) -> Ev
                     }
                 }
                 BuiltIn::LookAt => {
-                    if len != 2 {
-                        report(ErrorType::Runtime, line, format!("Expected 2 inputs to lookat(a, b), got {}", len));
-                    }
-
-                    let arg2 = vals.pop().unwrap();
-                    let arg1 = vals.pop().unwrap();
-    
-                    match (arg1, arg2) {
-                        (Vec3(_, _, _), Vec3(_, _, _)) => EvalRet::new(env).with_val(Some(Val::lookat(arg1, arg2))),
-                        (x, y) => report(ErrorType::Runtime, line, format!("Expected lookat(vec3, vec3), got lookat({:?}, {:?})", x, y))
-                    }
-                }
+                    builtin_two_args!(Val::lookat, "lookat", len, line, vals, env)
+               }
                 BuiltIn::Perspective => {
                     if len != 3 {
                         report(ErrorType::Runtime, line, format!("Expected 3 inputs to perspective(a, b, c), got {}", len));

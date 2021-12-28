@@ -5,7 +5,7 @@ use bml::{
 };
 use image::{io::Reader as ImageReader, DynamicImage};
 use rayon::prelude::*;
-use std::process;
+use std::{path::Path, process};
 
 macro_rules! gen_runtime_idents {
     ($($x:ident $(,)? )*) => {
@@ -19,7 +19,6 @@ macro_rules! gen_runtime_idents {
 }
 
 gen_runtime_idents!(resolution, coord, frag, frame, frame_count);
-
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
@@ -102,14 +101,50 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut frames = Vec::with_capacity(frame_count);
 
     let thread_count = match std::env::var("BML_THREADS") {
-        Ok(threads) => threads.parse::<usize>().expect("Environment variable 'BML_THREADS' was not set to a positive integer"),
-        Err(_) => 2
+        Ok(threads) => threads
+            .parse::<usize>()
+            .expect("Environment variable 'BML_THREADS' was not set to a positive integer"),
+        Err(_) => 2,
+    };
+
+    let mut out_path = match &output_path {
+        Some(output) => output.to_owned(),
+        None => {
+            let mut path = String::new();
+
+            // examples/closing_circle.buf
+            // examples/img/rocket.png
+
+            // -> examples/img/closing_circle_rocket.png
+
+            let image = image.as_ref().unwrap();
+
+            let image_prefix = &image[0..image.rfind('/').map(|x| x + 1).unwrap_or(image.len())];
+
+            path.push_str(image_prefix);
+
+            let script_name = Path::new(&script)
+                .file_stem()
+                .and_then(|x| x.to_str())
+                .expect("Could not extract stem from script path");
+
+            path.push_str(script_name);
+
+            let image_name = Path::new(image)
+                .file_name()
+                .and_then(|x| x.to_str())
+                .expect("Could not extract file name from image path");
+            let image_name = &image_name[0..image_name.rfind('.').unwrap_or(image_name.len())];
+
+            path.push('_');
+            path.push_str(image_name);
+
+            path
+        }
     };
 
     (0..frame_count).for_each(|frame| {
         env.set(rti.frame, Val::Float(frame as _));
-
-        // let mut frame = Vec::with_capacity((4 * width * height) as usize);
 
         let size = (width * height) as usize;
 
@@ -121,8 +156,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     (size * i / thread_count..size * (i + 1) / thread_count)
                         .flat_map(|index| {
                             let x = (index as u32) % width;
-                            let y = (index as u32) / height;
+                            let y = (index as u32) / width;
 
+                            // println!("{} {} {}", index, x, y);
                             let [r, g, b, a] = buffer.get_pixel(x, y).0;
 
                             let mut env = env.clone();
@@ -178,30 +214,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         image::ImageBuffer::from_raw(width, height, bytes).unwrap()
     };
 
-    let mut out_path = match output_path {
-        Some(output) => output,
-        None => {
-            let mut path = String::new();
-
-            path.push_str(
-                std::path::Path::new(&script)
-                    .file_stem()
-                    .and_then(|x| x.to_str())
-                    .expect("Could not extract file stem from script name"),
-            );
-
-            path.push('_');
-            path.push_str(&image.unwrap());
-
-            path
-        }
-    };
-
     match frame_count {
         0 => panic!("Expected positive number of frames for image/gif generations, got 0"),
-        1 => bytes_to_dynimg(frames.pop().unwrap()).save(&out_path)?,
+        1 => {
+            if output_path.is_none() {
+                out_path.push_str(".png");
+            }
+
+            bytes_to_dynimg(frames.pop().unwrap()).save(&out_path)?
+        }
         _ => {
-            out_path.push_str(".gif");
+            if output_path.is_none() {
+                out_path.push_str(".gif");
+            }
+
             use image::codecs::gif::*;
             use std::fs::File;
             let mut encoder = GifEncoder::new(File::create(&out_path)?);

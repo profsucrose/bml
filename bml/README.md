@@ -74,7 +74,7 @@ Similar to GLSL, BML has three basic types/primitives:
 
 * **Scalars** or floats
 
-Every number in GLSL is represented as an IEEE 754 32-bit float, or an `f32` in Rust. Unlike GLSL, since every number is a float, `1` and `1.0` are both floats, and can be used for any operations, expressions or statements that expect floats, e.g. vectors or matrices. Note, however, that unlike GLSL syntax like `.5` or `5.` is unsupported and will result in a `ParseError`.
+Every number in GLSL is represented as an IEEE 754 32-bit float, or an `f64` in Rust. Unlike GLSL, since every number is a float, `1` and `1.0` are both floats, and can be used for any operations, expressions or statements that expect floats, e.g. vectors or matrices. Note, however, that unlike GLSL syntax like `.5` or `5.` is unsupported and will result in a `ParseError`.
 
 * **Vectors**: BML has support for 2x1 vectors, 3x1 vectors, and a 4x1 vector.
 
@@ -280,49 +280,49 @@ large_value = 1000
 clamped = clamp(large_value, 2, 5) # becomes 5
 ```
 
-Most of the standard shading functions one would expect in GLSL is in BML:
+Most of the standard shading functions one would expect in GLSL are in BML:
 
-* dist(p0, p1): gets the distance between two floats or vectors
-* radians(degrees): converts a float or vector in degrees to be in radians
-* degrees(radians): converts a float or vector in radians to be in degrees
-* sin(angle): takes sine component-wise of float or vector
-* cos(angle): cosine of angle
-* tan(angle): tangent of angle
-* asin(x): arcsin of x
-* acos(x): arccos of x
-* atan(x): arctangent of x
-* pow(base, exponent): raises base to the power of exponent
-* exp(x): exponential function, or e^x
-* log(x): natural log of x
-* sqrt(x): square root of x
-* invsqrt: inverse square root of x
-* abs(x): absolute value of x
-* sign(x): gets sign of x -- for each component, return 1 if positive, 0 if 0, or -1 if negative
-* floor(x): gets the floor of (rounds down) x
-* ceil(x): gets the ceiling of (rounds up) x
-* fract(x): gets the fractional part of x
-* mod(x, y): gets the modulo of x and y
-* min(x, y): gets the minimum of x and y
-* max(x, y): gets the maximum of x and y
-* clamp(x, min, max): "clamps" x between min and max -- returns min if x <= min, max if x >= max, or x if otherwise
-* mix(x, y, a): linearly interpolates or "mixes" between x and y according to a (a=0 would return x, a=0.5 would return the value between x and y, and a=1 would be y). If x, y and a are all vectors (assuming they're all the same length) then perform mix component-wise. If x and y are vectors and a is a float, then perform mix component-wise where a is the same float for each component.
-* step(edge, x): returns 0 if x is smaller than edge, otherwise returns 1. Will do this component-wise if edge and x are floats/vectors of the same length, or will do it component-wise for x if edge is a scalar and x is a vector.
-* length(x): returns the length (or magnitude) of x if x is a vector
-* dot(x, y): takes the dot product of x and y
-* cross(x, y): takes the cross product of x and y
-* norm(x): normalizes x if x is a vector
-* mat2(col1, col2): creates a new 2x2 matrix
-* mat3(col1, col2, col3): creates a new 3x3 matrix
-* mat4(col1, col2, col3, col4): creates a new 4x4 matrix
-* rotate_x(radians): returns a 4x4 transformation matrix that rotates a specified number of radians about the x-axis
-* rotate_y(radians): returns a 4x4 transformation matrix that rotates about the y-axis
-* rotate_z(radians): returns a 4x4 transformation matrix that rotates about the z-axis
-* rotate(yaw, pitch, roll): returns a 4x4 transformation matrix that rotataes about the x, y and z axes according to yaw, pitch and roll (all in radians) respectively
-* scale(x): returns a 4x4 transformation matrix that scales a point x times
-* translate(x, y, z): returns a 4x4 transformation matrix that translates accordingly in the x, y, and z dimensions
-* ortho(near, far, left, right, top, bottom): returns a 4x4 transformation matrix for orthographic projection
-* lookat(from, to): returns a 4x4 transformation `lookat` matrix
-* perspective(fov, near, far)): returns a 4x4 perspective projection matrix
+* `dist(p0, p1)`: gets the distance between two floats or vectors
+* `radians(degrees)`: converts a float or vector in degrees to be in radians
+* `degrees(radians)`: converts a float or vector in radians to be in degrees
+* `sin(angle)`: takes sine component-wise of float or vector
+* `cos(angle)`: cosine of angle
+* `tan(angle)`: tangent of angle
+* `asin(x)`: arcsin of x
+* `acos(x)`: arccos of x
+* `atan(x)`: arctangent of x
+* `pow(base, exponent)`: raises base to the power of exponent
+* `exp(x)`: exponential function, or e^x
+* `log(x)`: natural log of x
+* `sqrt(x)`: square root of x
+* `invsqrt(x)`: inverse square root of x
+* `abs(x)`: absolute value of x
+* `sign(x)`: gets sign of x -- for each component, return 1 if positive, 0 if 0, or -1 if negative
+* `floor(x)`: gets the floor of (rounds down) x
+* `ceil(x)`: gets the ceiling of (rounds up) x
+* `fract(x)`: gets the fractional part of x
+* `mod(x, y)`: gets the modulo of x and y
+* `min(x, y)`: gets the minimum of x and y
+* `max(x, y)`: gets the maximum of x and y
+* `clamp(x, min, max)`: "clamps" x between min and max -- returns min if x <= min, max if x >= max, or x if otherwise
+* `mix(x, y, a)`: linearly interpolates or "mixes" between x and y according to a (a=0 would return x, a=0.5 would return the value between x and y, and a=1 would be y). If x, y and a are all vectors (assuming they're all the same length) then perform mix component-wise. If x and y are vectors and a is a float, then perform mix component-wise where a is the same float for each component.
+* `step(edge, x)`: returns 0 if x is smaller than edge, otherwise returns 1. Will do this component-wise if edge and x are floats/vectors of the same length, or will do it component-wise for x if edge is a scalar and x is a vector.
+* `length(x)`: returns the length (or magnitude) of x if x is a vector
+* `dot(x, y)`: takes the dot product of x and y
+* `cross(x, y)`: takes the cross product of x and y
+* `norm(x)`: normalizes x if x is a vector
+* `mat2(col1, col2)`: creates a new 2x2 matrix
+* `mat3(col1, col2, col3)`: creates a new 3x3 matrix
+* `mat4(col1, col2, col3, col4)`: creates a new 4x4 matrix
+* `rotate_x(radians)`: returns a 4x4 transformation matrix that rotates a specified number of radians about the x-axis
+* `rotate_y(radians)`: returns a 4x4 transformation matrix that rotates about the y-axis
+* `rotate_z(radians)`: returns a 4x4 transformation matrix that rotates about the z-axis
+* `rotate(yaw, pitch, roll)`: returns a 4x4 transformation matrix that rotataes about the x, y and z axes according to yaw, pitch and roll (all in radians) respectively
+* `scale(x)`: returns a 4x4 transformation matrix that scales a point x times
+* `translate(x, y, z)`: returns a 4x4 transformation matrix that translates accordingly in the x, y, and z dimensions
+* `ortho(near, far, left, right, top, bottom)`: returns a 4x4 transformation matrix for orthographic projection
+* `lookat(from, to)`: returns a 4x4 transformation `lookat` matrix
+* `perspective(fov, near, far))`: returns a 4x4 perspective projection matrix
 
 ### Sample()
 

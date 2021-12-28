@@ -132,7 +132,7 @@ impl<'a> Parser<'a> {
             );
         }
 
-        let times = match self.previous().lexeme.parse::<f32>() {
+        let times = match self.previous().lexeme.parse::<f64>() {
             Ok(times) => times,
             Err(_) => report(
                 ErrorType::Parse,
@@ -175,7 +175,7 @@ impl<'a> Parser<'a> {
             );
         }
 
-        let times = match self.previous().lexeme.parse::<f32>() {
+        let times = match self.previous().lexeme.parse::<f64>() {
             Ok(times) => times,
             Err(_) => report(
                 ErrorType::Parse,
@@ -553,7 +553,7 @@ impl<'a> Parser<'a> {
 
         SrcAst::new(
             Ast::V(Val::Float(
-                sign * self.previous().lexeme.parse::<f32>().unwrap(),
+                sign * self.previous().lexeme.parse::<f64>().unwrap(),
             )),
             self.previous().line,
         )

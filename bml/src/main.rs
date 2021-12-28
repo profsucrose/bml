@@ -167,10 +167,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             env.set(
                                 rti.frag,
                                 Val::Vec4(
-                                    r as f32 / 255.0,
-                                    g as f32 / 255.0,
-                                    b as f32 / 255.0,
-                                    a as f32 / 255.0,
+                                    r as f64 / 255.0,
+                                    g as f64 / 255.0,
+                                    b as f64 / 255.0,
+                                    a as f64 / 255.0,
                                 ),
                             );
 

@@ -37,9 +37,9 @@ pub struct Swizzle(
 
 // #[derive(PartialEq, Clone, Copy, Debug)]
 // pub enum Vector {
-//     Vec2(f32, f32),
-//     Vec3(f32, f32, f32),
-//     Vec4(f32, f32, f32, f32),
+//     Vec2(f64, f64),
+//     Vec3(f64, f64, f64),
+//     Vec4(f64, f64, f64, f64),
 // }
 
 // #[derive(PartialEq, Clone, Copy, Debug)]
@@ -51,44 +51,44 @@ pub struct Swizzle(
 
 // #[derive(PartialEq, Clone, Copy, Debug)]
 // pub enum Val {
-//     Float(f32),
+//     Float(f64),
 //     Vec(Vector),
 //     Mat(Matrix)
 // }
 
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub enum Val {
-    Float(f32),
-    Vec2(f32, f32),
-    Vec3(f32, f32, f32),
-    Vec4(f32, f32, f32, f32),
+    Float(f64),
+    Vec2(f64, f64),
+    Vec3(f64, f64, f64),
+    Vec4(f64, f64, f64, f64),
 
     // matrices are column-major
-    Mat2([f32; 2], [f32; 2]),
-    Mat3([f32; 3], [f32; 3], [f32; 3]),
-    Mat4([f32; 4], [f32; 4], [f32; 4], [f32; 4])
+    Mat2([f64; 2], [f64; 2]),
+    Mat3([f64; 3], [f64; 3], [f64; 3]),
+    Mat4([f64; 4], [f64; 4], [f64; 4], [f64; 4])
 }
 
 use Val::*;
 
 mod math {
-    pub fn rad(x: f32) -> f32 {
-        x * std::f32::consts::PI / 180.0
+    pub fn rad(x: f64) -> f64 {
+        x * std::f64::consts::PI / 180.0
     }
 
-    pub fn deg(x: f32) -> f32 {
-        x * 180.0 / std::f32::consts::PI
+    pub fn deg(x: f64) -> f64 {
+        x * 180.0 / std::f64::consts::PI
     }
 
-    pub fn inv_sqrt(x: f32) -> f32 {
+    pub fn inv_sqrt(x: f64) -> f64 {
         let i = x.to_bits();
         let i = 0x5f3759df - (i >> 1);
-        let y = f32::from_bits(i);
+        let y = f64::from_bits(i);
 
         y * (1.5 - 0.5 * x * y * y)
     }
 
-    pub fn mix(x: f32, y: f32, a: f32) -> f32 {
+    pub fn mix(x: f64, y: f64, a: f64) -> f64 {
         x * (1.0 - a) + y * a
     }
 }
@@ -103,14 +103,14 @@ macro_rules! vector_map {
 }
 
 impl Val {
-    pub fn float(self) -> Option<f32> {
+    pub fn float(self) -> Option<f64> {
         match self {
             Self::Float(x) => Some(x),
             _ => None,
         }
     }
 
-    pub fn map<F: FnMut(f32) -> f32>(self, mut f: F) -> Val {
+    pub fn map<F: FnMut(f64) -> f64>(self, mut f: F) -> Val {
         match self {
             Float(x) => Float(f(x)),
             Vec2(x, y) => Vec2(f(x), f(y)),
@@ -129,7 +129,7 @@ impl Val {
         }
     }
 
-    pub fn zipmap3<F: FnMut(f32, f32, f32) -> f32>(self, o1: Self, o2: Self, mut f: F) -> Result<Val, String> {
+    pub fn zipmap3<F: FnMut(f64, f64, f64) -> f64>(self, o1: Self, o2: Self, mut f: F) -> Result<Val, String> {
         match (self, o1, o2) {
             (Float(x), Float(y), Float(z)) => Ok(Float(f(x, y, z))),
             (Vec2(x0, x1), Vec2(y0, y1), Vec2(z0, z1)) => Ok(Vec2(f(x0, y0, z0), f(x1, y1, z1))),
@@ -148,7 +148,7 @@ impl Val {
         }
     }
 
-    pub fn zipmap<F: FnMut(f32, f32) -> f32>(self, o: Self, mut f: F) -> Result<Val, String> {
+    pub fn zipmap<F: FnMut(f64, f64) -> f64>(self, o: Self, mut f: F) -> Result<Val, String> {
         match (self, o) {
             (Float(l), Float(r)) => Ok(Float(f(l, r))),
             (Vec2(lx, ly), Float(r)) => Ok(Vec2(f(lx, r), f(ly, r))),
@@ -169,7 +169,7 @@ impl Val {
         }
     }
 
-    pub fn get_field(&self, f: Field) -> Result<f32, String> {
+    pub fn get_field(&self, f: Field) -> Result<f64, String> {
         use Val::*;
         match f {
             Field::X => match *self {
@@ -203,7 +203,7 @@ impl Val {
         }
     }
 
-    pub fn translate(x: f32, y: f32, z: f32) -> Val {
+    pub fn translate(x: f64, y: f64, z: f64) -> Val {
         Mat4(
             [x,   0.0, 0.0, 0.0],
             [0.0,   y, 0.0, 0.0],
@@ -212,7 +212,7 @@ impl Val {
         )
     }
 
-    pub fn rotate_x(angle: f32) -> Val {
+    pub fn rotate_x(angle: f64) -> Val {
         let c = angle.cos();
         let s = angle.sin();
 
@@ -224,7 +224,7 @@ impl Val {
         )
     }
 
-    pub fn rotate_y(angle: f32) -> Val {
+    pub fn rotate_y(angle: f64) -> Val {
         let c = angle.cos();
         let s = angle.sin();
 
@@ -236,7 +236,7 @@ impl Val {
         )
     }
 
-    pub fn rotate_z(angle: f32) -> Val {
+    pub fn rotate_z(angle: f64) -> Val {
         let c = angle.cos();
         let s = angle.sin();
 
@@ -248,11 +248,11 @@ impl Val {
         )
     }
 
-    pub fn rotate(yaw: f32, pitch: f32, roll: f32) -> Val {
+    pub fn rotate(yaw: f64, pitch: f64, roll: f64) -> Val {
         Val::rotate_z(yaw).mult(Val::rotate_y(pitch).mult(Val::rotate_x(roll)).unwrap()).unwrap()
     }
 
-    pub fn scale(s: f32) -> Val {
+    pub fn scale(s: f64) -> Val {
         Mat4(
             [  s, 0.0, 0.0, 0.0],
             [0.0,   s, 0.0, 0.0],
@@ -261,7 +261,7 @@ impl Val {
         )
     }
 
-    pub fn ortho(near: f32, far: f32, left: f32, right: f32, top: f32, bottom: f32) -> Val {
+    pub fn ortho(near: f64, far: f64, left: f64, right: f64, top: f64, bottom: f64) -> Val {
         Mat4(
             [ 2.0 / (right - left),                 0.0,                0.0, -(right + left) / (right - left) ],
             [                  0.0, 2.0 / (top - bottom),               0.0, -(top + bottom) / (top - bottom) ],
@@ -270,8 +270,8 @@ impl Val {
         )
     }
 
-    pub fn perspective(fov: f32, near: f32, far: f32) -> Val {
-        let s = 1.0 / (fov / 2.0 * std::f32::consts::PI / 180.0);
+    pub fn perspective(fov: f64, near: f64, far: f64) -> Val {
+        let s = 1.0 / (fov / 2.0 * std::f64::consts::PI / 180.0);
 
         Mat4(
             [s, 0.0, 0.0, 0.0],
@@ -411,39 +411,39 @@ impl Val {
     }
 
     pub fn sin(&self) -> Result<Val, String> {
-        vector_map!(self, "sin", f32::sin)
+        vector_map!(self, "sin", f64::sin)
     }
 
     pub fn cos(&self) -> Result<Val, String> {
-        vector_map!(self, "cos", f32::cos)
+        vector_map!(self, "cos", f64::cos)
     }
 
     pub fn tan(&self) -> Result<Val, String> {
-        vector_map!(self, "tan", f32::tan)
+        vector_map!(self, "tan", f64::tan)
     }
 
     pub fn asin(&self) -> Result<Val, String> {
-        vector_map!(self, "asin", f32::asin)
+        vector_map!(self, "asin", f64::asin)
     }
 
     pub fn acos(&self) -> Result<Val, String> {
-        vector_map!(self, "acos", f32::acos)
+        vector_map!(self, "acos", f64::acos)
     }
 
     pub fn atan(&self) -> Result<Val, String> {
-        vector_map!(self, "atan", f32::atan)
+        vector_map!(self, "atan", f64::atan)
     }
 
     pub fn exp(&self) -> Result<Val, String> {
-        vector_map!(self, "exp", f32::exp)
+        vector_map!(self, "exp", f64::exp)
     }
 
     pub fn log(&self) -> Result<Val, String> {
-        vector_map!(self, "log", |x| f32::log(std::f32::consts::E, x))
+        vector_map!(self, "log", |x| f64::log(std::f64::consts::E, x))
     }
 
     pub fn sqrt(&self) -> Result<Val, String> {
-        vector_map!(self, "sqrt", f32::sqrt)
+        vector_map!(self, "sqrt", f64::sqrt)
     }
 
     pub fn invsqrt(&self) -> Result<Val, String> {
@@ -451,23 +451,23 @@ impl Val {
     }
 
     pub fn abs(&self) -> Result<Val, String> {
-        vector_map!(self, "abs", f32::abs)
+        vector_map!(self, "abs", f64::abs)
     }
 
     pub fn sign(&self) -> Result<Val, String> {
-        vector_map!(self, "sign", f32::signum)
+        vector_map!(self, "sign", f64::signum)
     }
 
     pub fn floor(&self) -> Result<Val, String> {
-        vector_map!(self, "floor", f32::floor)
+        vector_map!(self, "floor", f64::floor)
     }
 
     pub fn ceil(&self) -> Result<Val, String> {
-        vector_map!(self, "ceil", f32::ceil)
+        vector_map!(self, "ceil", f64::ceil)
     }
 
     pub fn fract(&self) -> Result<Val, String> {
-        vector_map!(self, "fract", f32::fract)
+        vector_map!(self, "fract", f64::fract)
     }
 
     pub fn pow(&self, exp: Self) -> Result<Val, String> {
@@ -699,8 +699,8 @@ pub enum BuiltIn {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Ast {
     V(Val),
-    Repeat(f32, Box<SrcAst>),
-    While(Box<SrcAst>, f32, Box<SrcAst>),
+    Repeat(f64, Box<SrcAst>),
+    While(Box<SrcAst>, f64, Box<SrcAst>),
     Assign(Spur, Box<SrcAst>),
     Block(Vec<SrcAst>),
     VecLiteral(
@@ -790,7 +790,7 @@ impl<'a> Sampler<'a> {
         Sampler { image, width, height }
     }
 
-    pub fn sample(&self, x: f32, y: f32) -> Val {
+    pub fn sample(&self, x: f64, y: f64) -> Val {
         if x > 1.0 || x < 0.0 {
             return Vec4(0.0, 0.0, 0.0, 0.0);
         }
@@ -799,9 +799,9 @@ impl<'a> Sampler<'a> {
             return Vec4(0.0, 0.0, 0.0, 0.0);
         }
 
-        let [r, g, b, a] = self.image.get_pixel((x * ((self.width - 1) as f32)) as u32, (y * ((self.height - 1) as f32)) as u32).0;
+        let [r, g, b, a] = self.image.get_pixel((x * ((self.width - 1) as f64)) as u32, (y * ((self.height - 1) as f64)) as u32).0;
 
-        Vec4(r as f32 / 255.0, g as f32 / 255.0,  b as f32 / 255.0, a as f32 / 255.0)
+        Vec4(r as f64 / 255.0, g as f64 / 255.0,  b as f64 / 255.0, a as f64 / 255.0)
     }
 }
 
@@ -1036,13 +1036,13 @@ pub fn eval<'a>(&SrcAst { line, ref ast }: &SrcAst, e: Env<'a>, r: &Rodeo) -> Ev
 
     match ast {
         Repeat(times, block) => {
-            if *times < 1.0 - f32::EPSILON {
+            if *times < 1.0 - f64::EPSILON {
                 report(ErrorType::Runtime, line, format!("Expected positive compile-time literal in repeat statement, got {}", times));
             }
 
             let t = *times as usize;
 
-            if (times - (t as f32)).abs() > f32::EPSILON {
+            if (times - (t as f64)).abs() > f64::EPSILON {
                 report(ErrorType::Runtime, line, format!("Expected whole number in repeat statement, got {}", times));
             }
 
@@ -1055,13 +1055,13 @@ pub fn eval<'a>(&SrcAst { line, ref ast }: &SrcAst, e: Env<'a>, r: &Rodeo) -> Ev
             ret
         }
         While(cond, times, block) => {
-            if *times < 1.0 - f32::EPSILON {
+            if *times < 1.0 - f64::EPSILON {
                 report(ErrorType::Runtime, line, format!("Expected positive number of iterations in while statement, got {}", times));
             }
 
             let t = *times as usize;
 
-            if (times - (t as f32)).abs() > f32::EPSILON {
+            if (times - (t as f64)).abs() > f64::EPSILON {
                 report(ErrorType::Runtime, line, format!("Expected whole number of iterations in while statement, got {}", times));
             }
 
@@ -1280,10 +1280,10 @@ pub fn eval<'a>(&SrcAst { line, ref ast }: &SrcAst, e: Env<'a>, r: &Rodeo) -> Ev
                     Ok(result) => result,
                     Err(error) => report(ErrorType::Runtime, line, error)
                 },
-                (Float(l), Op::More, Float(r)) => Float((l > r) as i32 as f32),
-                (Float(l), Op::Less, Float(r)) => Float((l < r) as i32 as f32),
-                (Float(l), Op::MoreEq, Float(r)) => Float((l >= r) as i32 as f32),
-                (Float(l), Op::LessEq, Float(r)) => Float((l <= r) as i32 as f32),
+                (Float(l), Op::More, Float(r)) => Float((l > r) as i64 as f64),
+                (Float(l), Op::Less, Float(r)) => Float((l < r) as i64 as f64),
+                (Float(l), Op::MoreEq, Float(r)) => Float((l >= r) as i64 as f64),
+                (Float(l), Op::LessEq, Float(r)) => Float((l <= r) as i64 as f64),
                 (Float(l), Op::Equal, Float(r)) => Float(if l == r { 1.0 } else { 0.0 }),
                 (Float(l), Op::NotEqual, Float(r)) => Float(if l != r { 1.0 } else { 0.0 }),
                 _ => report(

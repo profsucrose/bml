@@ -29,7 +29,7 @@ pub fn render_progress(progress: usize) {
     }
 
     out.push_str(&format!("{}", format!("{}% complete: ", progress * 10).yellow().bold()));
-    
+
     out.push_str("[");
 
     for i in 1..=10 {
@@ -76,7 +76,7 @@ pub fn help() -> ! {
   bml new <script> <width> <height> <frames> <output_path>
       Generate new image with a given width and height with a script and write the result to a path.");
     
-      println!();
+    println!();
     
     println!(" Process and manipulate images, or generate new ones, using the Buffer Manipulation Language.");
 

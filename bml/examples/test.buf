@@ -1,0 +1,9 @@
+macro stmt() {
+    x = x + 1
+}
+
+x = 0
+
+stmt()
+
+return x

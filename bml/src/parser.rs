@@ -96,7 +96,10 @@ impl<'a> Parser<'a> {
     }
 
     fn statement(&mut self) -> SrcAst {
-        if self.match_token(TokenType::Identifier) {
+        if self.check(TokenType::Identifier) 
+            && self.check_next(TokenType::Equals) 
+        {
+            self.advance();
             return self.assign();
         }
 
@@ -489,6 +492,14 @@ impl<'a> Parser<'a> {
 
         if self.match_token(TokenType::LeftSquare) {
             return self.vector();
+        }
+
+        if self.at_end() {
+            report(
+                ErrorType::Parse,
+                self.peek().line,
+                "Unexpected EoF, remember to close your blocks and end your vectors dumbfuck"
+            )
         }
 
         report(

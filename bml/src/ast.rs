@@ -492,7 +492,7 @@ impl Val {
             (Vec2(x0, y0), Vec2(x1, y1)) => Ok(Float(x0 * x1 + y0 * y1)),
             (Vec3(x0, y0, z0), Vec3(x1, y1, z1)) => Ok(Float(x0 * x1 + y0 * y1 + z0 * z1)),
             (Vec4(x0, y0, z0, w0), Vec4(x1, y1, z1, w1)) => {
-                Ok(Float(x0 * x1 + y0 * y1 + z0 * z1 + w0 + w1))
+                Ok(Float(x0 * x1 + y0 * y1 + z0 * z1 + w0 * w1))
             }
             _ => Err(format!(
                 "Expected dot(vec2, vec2), dot(vec3, vec3), dot(vec4, vec4), got dot({:?}, {:?})",

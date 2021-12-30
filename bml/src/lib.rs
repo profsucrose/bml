@@ -14,16 +14,16 @@ pub fn string_to_ast<S: AsRef<str>>(string: S) -> (lasso::Rodeo, ast::SrcAst) {
     let raw = Scanner::from(string.as_ref().to_owned()).scan();
     let expanded = PreProcessor::from(raw).process();
 
-    for i in 0..expanded.len() {
-        let token = &expanded[i];
+    // for i in 0..expanded.len() {
+    //     let token = &expanded[i];
 
-        match expanded.get(i - 1) {
-            Some(t) if t.line != token.line => println!(),
-            _ => {}
-        }
+    //     match expanded.get(i - 1) {
+    //         Some(t) if t.line != token.line => println!(),
+    //         _ => {}
+    //     }
 
-        print!("{} ", token.lexeme);
-    }
+    //     print!("{} ", token.lexeme);
+    // }
 
     let (ro, ast) = Parser::from(&expanded).parse();
     let const_ro = lasso::Rodeo::new();

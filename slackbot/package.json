@@ -4,9 +4,9 @@
     "description": "Programmatically manipulate and generate images using the Buffer Manipulation Language",
     "main": "build/app.js",
     "scripts": {
-        "tsc": "tsc src/app.js",
         "dev": "ts-node-dev --respawn --transpile-only src/app.ts",
-        "prod": "nodemon ./build/src/app.js"
+        "prod": "tsc -p . && node ./build/src/app.js",
+        "clean": "rm -rf build"
     },
     "license": "ISC",
     "dependencies": {

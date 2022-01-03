@@ -498,7 +498,7 @@ impl<'a> Parser<'a> {
             report(
                 ErrorType::Parse,
                 self.peek().line,
-                "Unexpected EoF, remember to close your blocks and end your vectors dumbfuck"
+                "Unexpected EoF -- did you forget a ']' or '}'?"
             )
         }
 

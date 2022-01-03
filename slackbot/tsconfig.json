@@ -8,13 +8,17 @@
         "sourceMap": true,
         "outDir": "build",
         "sourceRoot": "src",
-        "watch": true
+        // "watch": true
+        "lib": [
+            "ES2021.String"
+        ]
     },
     "lib": [
         "es2017"
     ],
     "include": [
         "src/",
-        "auth.json"
+        "auth.json",
+        "domains.json"
     ]
 }

@@ -7,6 +7,8 @@
 *.gif
 build
 auth.json
+domains.json
+log.txt
 tmp
 .DS_Store
 .vscode

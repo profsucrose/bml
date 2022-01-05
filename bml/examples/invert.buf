@@ -1,3 +1,0 @@
-# invert each pixel
-
-return [1 - frag.r, 1 - frag.g, 1 - frag.b, 1]

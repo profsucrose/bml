@@ -1,3 +1,5 @@
+# generate arbitrary Julia Set w/ projection + rotation as gif
+
 macro complex_mult(a, b) {
     give [a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x]
 }
@@ -9,10 +11,9 @@ macro complex_abs(complex) {
 z = coord / resolution
 z = [mix(-2, 2, z.x), mix(-1, 1, z.y)] 
 
-# z = ([z.x, z.y, 0, 1] * perspective(45.0, 0.0, 100.0) * rotate_x(mix(0, 5 * 3.14159, frame / frame_count)))
+z = ([z.x, z.y, 0, 1] * perspective(45.0, 0.0, 100.0) * rotate_x(mix(0, 5 * 3.14159, frame / frame_count)))
 
-# z = z.xy / z.z
-z = z.xy
+z = z.xy / z.z
 
 # c = [0, 0]
 c = [-0.12, -0.77]

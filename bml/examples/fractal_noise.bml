@@ -1,3 +1,5 @@
+# generates fractal noise texture (WIP!)
+
 macro random(st) {
     give fract(sin(dot((st).xy, [12.9898,78.233])) * 43758.5453123)
 }

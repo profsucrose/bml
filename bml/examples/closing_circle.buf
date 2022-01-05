@@ -1,1 +1,0 @@
-return frag * (dist(coord / resolution, [0.5, 0.5]) < (1.0 - frame / (frame_count - 1)))

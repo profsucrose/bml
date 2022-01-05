@@ -1,17 +1,22 @@
 # bml
 
-## "Buffer Manipulation Language"
-
-Preprocessor and runtime for basic but programmatic image manipulation
+BML, or "Buffer Manipulation Language," is a preprocessor and runtime for basic but programmatic image manipulation.
 
 ## Building
 
-BML uses Rust, and be built and/or run with `cargo`, which can be installed using [rustup](https://rustup.rs/).
+BML uses Rust, and can be built or run using `cargo`, which can be installed using [rustup](https://rustup.rs/).
 
-Run 
+For *nix users, you can download the `/bml` subdir with:
+```bash
+git clone https://github.com/profsucrose/bml _bml && mv _bml/bml . && rm -rf _bml
+```
+
+And then to build, run
+
 ```bash
 cargo run --release <options>
 ```
+
 while in the directory, or use `cargo build --release` and run the built binary in `./target/release/bml`.
 
 Although building in release mode is not necessary, it is highly recommended for improved performance.
@@ -22,21 +27,25 @@ When running BML, there are three primary options:
 
 ```./bml eval <path/to/script.buf>```
 
-Will simply evaluate the given script and print the `return`-ed result.
+Which will simply evaluate the given script and print the `return`-ed result.
 
 ```./bml process <path/to/script.buf> <path/to/image.png> <frames> [output_path]```
 
-Will process a given image through a given script. If `<frames>` is specified and greater than 1, a gif will be generated instead of a static image. The output will be written to an automatically determined path, or write to `output_path` instead if valid.
+Which will process a given image through a given script. If `<frames>` is specified and greater than 1, a gif will be generated instead of a static image. The output will be written to an automatically determined path, or alternatively write to `output_path` instead if valid.
 
 ```bml new <script> <width> <height> <frames> <output_path>```
 
-Instead of processing an existing image, `new` will create a new image from scratc using a given script, where `frag` will be set to `[0, 0, 0, 0]` for every pixel. Like `process`, if `<frames>` is greater than 1 the output will be a GIF instead of a PNG.
+Which, instead of processing an existing image like `bml process`, `new` will create a new image from scratch using a given script, where `frag` will be set to `[0, 0, 0, 0]` for every pixel. Like `process`, if `<frames>` is greater than 1 the output will be a GIF instead of a PNG.
 
 ## Intro
 
-BML itself is a fairly rudimentary C-like language loosely inspired by the likes of shading languages such as GLSL. The premise is that you take in any arbitrary image, and then for each pixel/coordinate return a new one.
+BML itself is a fairly rudimentary C-like language loosely inspired by the likes of shading languages such as GLSL. The premise is that you take in any arbitrary image, and then for each pixel/coordinate output a new one, resulting in a brand new image (or animation!).
 
-As an example, this is a script that will invert every pixel in an image:
+As an example, let's take this initial image:
+
+<img src="examples/img/rocket.png" width=250 height=250 alt="A starting image" />
+
+And run it through this script, which will invert every pixel in an image:
 
 ```invert.bml
 # invert each pixel
@@ -44,23 +53,41 @@ As an example, this is a script that will invert every pixel in an image:
 return [1 - frag.r, 1 - frag.g, 1 - frag.b, 1]
 ```
 
-For each pixel, the script will take each component (every image is processed and returned as RGBA) and subtract it from 1.
+After running `bml process`, we get this:
+
+<img src="examples/img/invert_rocket.png" width=250 height=250 alt="Starting image after running `invert.bml`" />
+
+For each pixel (or fragment/`frag`, represented as an RGBA vec4 from 0-1) the script will subtract each component from 1, and then keep the original opacity of the pixel (note that the lack of a background is preserved).
+
+If you're familiar with the likes of GLSL or Shadertoy, this should look pretty familiar.However, BML offers the advantage of having a good bit less boilerplate/setup and is specifically oriented around processing images.
 
 Similarly, BML also has support for easily generating gifs:
 
-```
-# Tom and Jerry-style closing circle
+```closing_circle.bml
+# - cartoon-style closing circle - #
 
+# get normalized x, y coordinates from 0-1
 uv = coord / resolution
+
+# get distance to center
 distance = dist(uv, [0.5, 0.5])
-return frag if distance < frame / frame_count else [1; 4]
+
+# radius starts at 1 and shrinks to 0 as frame/frame_count goes from 0 to 1
+radius = 1 - frame / (frame_count - 1)
+
+# if distance is less than the radius, pixel is inside circle
+circle = distance < radius               
+
+return frag if circle else [0, 0, 0, 1]  # return original pixel if inside circle, else black
 ```
 
-Instead of taking a frame, running each pixel through a script and returning a new image, this script will take an image, a specified number of frames, and for each frame process each pixel in the image with `frame` set to the current frame and `frame_count` set to the number of frames in the gif. 
+Which, when running `bml process` with the image from earlier, outputs this:
 
-[Place rocket gif here]
+<img src="examples/img/closing_circle_rocket.gif" width=300 height=300>
 
-Hence, as `frame / frame_count` approaches 1, more and more of the pixels will have a `uv` too far from the center, and more and more of the gif becomes black.
+Instead of only processing a single frame, BML in this case (when run with multiple frames specified, e.g. 20 in the above example) will generate some arbitrary number of frames by duplicating the original image and running a script on each one. 
+
+Then, in the script itself, we can see which frame we are on by getting the `frame` variable, which is the index of the current frame (0-indexed, so going from 0 to 19 in the example) and comparing it to `frame_count`, which is the total number of frames (e.g. 20).
 
 In summary BML is pretty much a simplified, dynamically-typed GLSL specifically oriented around easily and concisely processing images and gifs.
 
@@ -70,23 +97,23 @@ Most of the syntax should be familiar to anyone used to a C-family language/GLSL
 
 ### Types
 
-Similar to GLSL, BML has three basic types/primitives:
+BML has three basic types/primitives:
 
 * **Scalars** or floats
 
-Every number in GLSL is represented as an IEEE 754 32-bit float, or an `f32` in Rust. Unlike GLSL, since every number is a float, `1` and `1.0` are both floats, and can be used for any operations, expressions or statements that expect floats, e.g. vectors or matrices. Note, however, that unlike GLSL syntax like `.5` or `5.` is unsupported and will result in a `ParseError`.
+Every number in GLSL is represented as an IEEE 754 32-bit float, or an `f32` in Rust. Unlike GLSL, since every number is a float, `1` and `1.0` are both floats, and can be used for any operations, expressions or statements that expect floats, e.g. vectors or matrices. Note, however, that GLSL syntax like `.5` or `5.` is unsupported and will result in a `ParseError`.
 
-* **Vectors**: BML has support for 2x1 vectors, 3x1 vectors, and a 4x1 vector.
+* **Vectors**: BML has support for 2x1 vectors, 3x1 vectors, and 4x1 vectors. (Or called "vec2", "vec3" and "vec4" respectively)
 
-Unlike GLSL, the syntax for vectors in BML are more like arrays in Rust than function calls. You can initialize a vec2, a vec3, or a vec4 with `[1, 2]`, `[1, 2, 3]` or `[1, 2, 3, 4]` respectively. You can also concisely define a vector with a repeated value by putting the value, a `;`, and then the length: e.g., `[1, 1, 1, 1]` becomes `[1; 4]`. This works for any arbitrary expression as well, so the former is equal to `[0.5 * 2 * 7 / 7; 4]`, or `[x; 4]` if `x=1`.
+Unlike GLSL, the syntax for vectors in BML are more like arrays in Rust than function calls. You can initialize a vec2, a vec3, or a vec4 with `[1, 2]`, `[1, 2, 3]` or `[1, 2, 3, 4]` respectively. You can also concisely define a vector with a repeated value by putting the value, a `;`, and then the length: e.g., `[1, 1, 1, 1]` becomes `[1; 4]`. This works for any arbitrary expression as well, so `[1; 4]` is equal to `[0.5 * 2 * 7 / 7; 4]`, or `[x; 4]` if `x=1`.
 
-A vector component can be acccessed with the `.` syntax `.x`, `.y`, `.z`, `.w`. So `[1, 2].x` becomes `1`. You can also use the aliases `.rgba` when using colors, so `[0.5, 0.5, 0].r` is `0.5`.
+A vector component can be acccessed with the `.` syntax `.x`, `.y`, `.z`, `.w`. So `[1, 2].x` becomes `1`. You can also use the aliases `.rgba` when using colors, so `[0.5, 0.1, 0.9].r` is `0.5`.
 
- You can also "swizzle" vectors in any order to get any new vector or float. For example, `[1, 2, 3, 4].xyzw` becomes `[1, 2, 3, 4]`, or `[0.5, 0.5, 0.5].rg` becomes `[0.5, 0.5]`.
+ You can also "swizzle" vectors in any order to get any new vector or float. For example, `[1, 2, 3, 4].wyzx` returns `[4, 2, 3, 1]`, or `[0.1, 0.2, 0.3].rg` becomes `[0.1, 0.2]`.
 
  * **Matrices**: BML also suports built-in 2x2, 3x3 and 4x4 matrix primitives.
 
-A matrix is treated as just a list of vectors, hence you can define a matrix by specifying each column using built-in functions. `mat2([1, 0], [0, 1])` becomes 
+A matrix is treated as just a (column-major) list of vectors/columns, hence you can define a matrix by specifying each column using built-in functions. `mat2([1, 0], [0, 1])` becomes 
 
 ```
 [ 1, 0 ]
@@ -101,8 +128,7 @@ or `mat3([1, 2, 3], [4, 5, 6], [7, 8, 9])` becomes
 [ 3, 6, 9 ]
 ```
 
-
-Note that matrices are _column-major_ (which could result in some bugs!) so the first argument to `mat2`, `mat3` or `mat4` is the _first column_ and not the first row.
+Note again that matrices are _column-major_ (which could result in some bugs!) so the first argument to `mat2`, `mat3` or `mat4` is the _first column_ and not the first row.
 
 You can index a matrix to get a column with `<matrix>[column]`. So `mat2([1, 0], [0, 1])[0] == [1, 0]`.
 
@@ -110,7 +136,7 @@ You can multiply matrices with vectors to represent transformations. So for inst
 
 ### Variables
 
-Variable declarations are just `<name> = <value>`, where no variable is typed and can be redefined at any time. If a variable is used before it is defined, BML will throw an error:
+Variable declarations are just `<name> = <value>`, where no variable is statically-typed and can be redefined at any time. If a variable is used before it is defined, BML will throw an error:
 
 ```
 x = 10 * 2 + 1
@@ -121,20 +147,19 @@ x = y + y
 x = z # will throw an error
 ```
 
-#### Uniforms
+### Uniforms
 
 For getting the current pixel, coordinate, or gif frame, BML loads some variables into the script namespace:
 
-*vec2 coord*: stores the current pixel coordinate as [x, y]. Note that this is not normalized, so for instance if processign a 100 by 100 pixel image, the `coord` variable would be [0, 0] at the bottom-left and [100, 100] at the top-right.
+`vec2 coord`: stores the current pixel coordinate as [x, y]. Note that this is not normalized, so for instance if processign a 100 by 100 pixel image, the `coord` variable would be [0, 0] at the bottom-left and [100, 100] at the top-right.
 
-*vec2 resolution*: stores the width and height of the image as [width, height]
+`vec2 resolution`: stores the width and height of the image as [width, height]
 
-*vec2 frag*: stores current pixel color as [r, g, b, a] where each color is 0-1.
+`vec2 frag`: stores current pixel color as [r, g, b, a] where each color is 0-1.
 
-*float frame*: stores current frame if processing a gif. Starts at 0 and ends at `frame_count - 1`
+`float frame`: stores current frame if processing a gif. Starts at 0 and ends at `frame_count - 1`
 
-*float frame_count*: stores the specified number of frames if processing a gif.
-
+`float frame_count`: stores the specified number of frames if processing a gif.
 
 ### Control Flow
 
@@ -335,26 +360,32 @@ Although the `frag` variable already gives you the color of the current pixel, b
 A BML program consists of a series of statements which at some point must return a new RGBA color represented as a 4x1 vector `[R, G, B, A]`, where each component is from 0 to 1, using the `return` statement. Going back to the closing circle example:
 
 ```
-# Tom and Jerry-style closing circle
+# cartoon-style closing circle
 
 uv = coord / resolution
 distance = dist(uv, [0.5, 0.5])
-return frag if distance < frame / frame_count else [1; 4]
+circle = distance < 1 - frame / (frame_count - 1)
+return frag if circle else [0, 0, 0, 1]
 ```
 
 How the script returns the new pixel color is through that final `return` statement. Note that this is short-circuiting:
 
 ```
-# Tom and Jerry-style closing circle
+# cartoon-style closing circle
 
 uv = coord / resolution
 distance = dist(uv, [0.5, 0.5])
+circle = distance < 1 - frame / (frame_count - 1)
 
 {
     # if condition is true, then program would end here
     return frag
-} if distance < frame / frame_count>
+} if circle
 
 # does not run if condition is true
 return [1; 4]
 ```
+
+## Examples
+
+Some more example scripts can be seen in `examples` and the images rendered from them in `examples/img`.

@@ -1,4 +1,4 @@
-# generate white circle #
+# generate white circle
 
 # normalize coordinates
 uv = coord / resolution

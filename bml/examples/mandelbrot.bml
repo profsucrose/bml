@@ -1,3 +1,5 @@
+# mandelbrot in BML
+
 macro complex_mult(a, b) {
     give [a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x]
 }

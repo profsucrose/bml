@@ -1,5 +1,5 @@
-quadrant = abs(coord - resolution/2) / resolution
+# splits texture into quadrants
 
-quadrant = rotate_z(frame / (frame_count - 1) * 3.14159) * [quadrant.x, quadrant.y, 0, 1]
+quadrant = abs(coord - resolution/2) / resolution
 
 return sample(quadrant.xy * sign(coord) * 2)

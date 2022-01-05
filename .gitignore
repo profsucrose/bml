@@ -1,15 +1,23 @@
-**/target
-.env
-**/.env
-*.swp
-*.swo
-*.png
-*.gif
-build
-auth.json
-domains.json
+node_modules
 log.txt
 tmp
+build
+**/target
+
+# vi swapfiles
+*.swp
+*.swo
+
+# any scattered pngs/gifs that aren't examples
+*.png
+!bml/examples/img/*.png
+
+*.gif
+!bml/examples/img/*.gif
+
+# critical json files
+auth.json
+domains.json
+
 .DS_Store
 .vscode
-node_modules
